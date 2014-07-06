@@ -13,7 +13,7 @@
 
 #ifdef FIX_CLASS
 
-FixStyle(driver,FixIPI)
+FixStyle(ipi,FixIPI)
 
 #else
 
