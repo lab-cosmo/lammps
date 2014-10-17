@@ -315,12 +315,12 @@ void FixIPI::initial_integrate(int vflag)
   double *boxlo = domain->boxlo;
   double posconv;
   posconv=0.52917721*force->angstrom;
-  boxlo[0] = 0;
-  boxlo[1] = 0;
-  boxlo[2] = 0;
-  boxhi[0] = cellh[0]*posconv;
-  boxhi[1] = cellh[4]*posconv;
-  boxhi[2] = cellh[8]*posconv;
+  boxlo[0] = -0.5*cellh[0]*posconv;
+  boxlo[1] = -0.5*cellh[4]*posconv;
+  boxlo[2] = -0.5*cellh[8]*posconv;
+  boxhi[0] = 0.5*cellh[0]*posconv;
+  boxhi[1] = 0.5*cellh[4]*posconv;
+  boxhi[2] = 0.5*cellh[8]*posconv;
   domain->xy = cellh[1]*posconv;
   domain->xz = cellh[2]*posconv;
   domain->yz = cellh[5]*posconv;
