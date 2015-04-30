@@ -97,6 +97,7 @@ void Temper::command(int narg, char **arg)
 
   if ((strcmp(modify->fix[whichfix]->style,"nvt") != 0) &&
       (strcmp(modify->fix[whichfix]->style,"langevin") != 0) &&
+      (strcmp(modify->fix[whichfix]->style,"gle") != 0) &&  
       (strcmp(modify->fix[whichfix]->style,"temp/berendsen") != 0) &&
       (strcmp(modify->fix[whichfix]->style,"temp/rescale") != 0))
     error->universe_all(FLERR,"Tempering temperature fix is not valid");
