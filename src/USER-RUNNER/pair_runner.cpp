@@ -2054,7 +2054,9 @@ void PairRuNNer::calc_G_dG_group(int ca, RuNNer_forces *F, RuNNer_symfuncGroup *
     int*& etaind    = GG->etaind;
     double*& eta    = GG->eta   ;
     double*& zeta   = GG->zeta  ;
-    double*& lambda = GG->lambda;
+    double*& lambda = GG->lambda;    
+    double*& zetalambda  = GG->zetalambda  ;
+    double*& etaizl = GG->etaizl;    
     double*& rs     = GG->rs    ;
 
     int Nej, Nek;
@@ -2071,7 +2073,12 @@ void PairRuNNer::calc_G_dG_group(int ca, RuNNer_forces *F, RuNNer_symfuncGroup *
     double pexp, plambda, pfc, pdfc;
     double pfcij, pfcik, pfcjk;
     double pdfcij, pdfcik, pdfcjk;
-    double p1, p2, p3;
+    double pfczl; 
+    double p1, p2, p3, pdd;
+    double q1, q2, q3;    
+    double p1dxij, p1dyij, p1dzij;
+    double p2dxik, p2dyik, p2dzik;
+    double p3dxjk, p3dyjk, p3dzjk;    
     double p2etaplambda;
     double fg;
 
@@ -2079,7 +2086,6 @@ void PairRuNNer::calc_G_dG_group(int ca, RuNNer_forces *F, RuNNer_symfuncGroup *
     double* svalue = NULL;
     double* pnorm = NULL;
     double r2sum = 0.0;
-    double zl = 0.0;
     double vexp = 0.0;
 
     double* xptr = NULL;
@@ -2107,7 +2113,8 @@ void PairRuNNer::calc_G_dG_group(int ca, RuNNer_forces *F, RuNNer_symfuncGroup *
                 pdfc = dfc(rij, rcinv);
                 for(int isym=0; isym<numSF; isym++) {
                     // energy calculation
-                    pexp = exp(-eta[isym] * (rij - rs[isym]) * (rij - rs[isym]));
+                    //pexp = exp(-eta[isym] * (rij - rs[isym]) * (rij - rs[isym]));
+                    pexp = fastexp(-eta[isym] * (rij - rs[isym]) * (rij - rs[isym]));
                     value[isym] += pexp * pfc;
                     // force calculation
                     p1 = (pdfc - 2.0 * eta[isym] * (rij - rs[isym]) * pfc) * pexp / rij;
@@ -2154,10 +2161,11 @@ void PairRuNNer::calc_G_dG_group(int ca, RuNNer_forces *F, RuNNer_symfuncGroup *
                             dyjk = N->dy[k] - dyij;
                             dzjk = N->dz[k] - dzij;
                             rjk = dxjk * dxjk + dyjk * dyjk + dzjk * dzjk;
-                            if(rjk <= rc2) {
+                            if(rjk <= rc2) {                                
+                                r2ik = rik * rik;
+                                r2sum = r2ij + r2ik + rjk;
                                 rjk = sqrt(rjk);
                                 rinvijik = 1.0 / (rij * rik);
-                                r2ik = rik * rik;
                                 dxik = N->dx[k];
                                 dyik = N->dy[k];
                                 dzik = N->dz[k];
@@ -2165,44 +2173,66 @@ void PairRuNNer::calc_G_dG_group(int ca, RuNNer_forces *F, RuNNer_symfuncGroup *
                                 pfcjk = fc(rjk, rcinv);
                                 costijk = dxij * dxik + dyij * dyik + dzij * dzik; 
                                 costijk *= rinvijik;
+                                
                                 pfc = pfcij * pfcik * pfcjk; 
                                 pdfcik = dfc(rik, rcinv);
                                 pdfcjk = dfc(rjk, rcinv);
-                                r2sum = r2ij + r2ik + rjk * rjk;
+                                
                                 pr1 = pfcik * pfcjk * pdfcij / rij;
                                 pr2 = pfcij * pfcjk * pdfcik / rik;
                                 pr3 = pfcij * pfcik * pdfcjk / rjk;
+                                q1 = rinvijik - costijk / r2ij;
+                                q2 = rinvijik - costijk / r2ik;
+                                q3 = rinvijik;
                                 for(int isym=0; isym<numSF; isym++) {
                                     plambda = 1.0 + lambda[isym] * costijk;
                                     if(etaind[isym] == isym) {
-                                        vexp = exp(-eta[isym] * r2sum);
+                                        //vexp = exp(-eta[isym] * r2sum);
+                                        vexp = fastexp(-eta[isym] * r2sum);
                                     }
                                     if(plambda <= 0.0) fg = 0.0;
                                     else {
                                         if(optpow[isym]) fg = powint(plambda, optpow[isym] - 1) * vexp;
                                         else fg = pow(plambda, zeta[isym] - 1.0) * vexp;
                                     }
-                                    value[isym] += fg * plambda * pfc;
+                                    
+                                    //! TODO one could save a heap by screening the function for value, i.e. not including contributions that are smaller than a tiny fraction of the current value
+                                    pfczl = fg * plambda * pfc; 
+                                    //if (pfczl < 1e-6*value[isym]) continue;
+                                    value[isym] += pfczl;
+                                    
                                     // force calculation
                                     fg *= pnorm[isym];
-                                    zl = zeta[isym] * lambda[isym];
-                                    p2etaplambda = 2.0 * eta[isym] * plambda / zl;
-                                    p1 = fg * (pfc * zl * (rinvijik - costijk / r2ij - p2etaplambda) + pr1 * plambda);
-                                    p2 = fg * (pfc * zl * (rinvijik - costijk / r2ik - p2etaplambda) + pr2 * plambda);
-                                    p3 = fg * (pfc * zl * (rinvijik                  + p2etaplambda) - pr3 * plambda);
+                                    p2etaplambda = plambda * etaizl[isym];
+                                    /*
+                                    pfczl = pfc*zl; 
+                                    p1 = fg * (pfczl * (rinvijik - costijk / r2ij - p2etaplambda) + pr1 * plambda);
+                                    p2 = fg * (pfczl * (rinvijik - costijk / r2ik - p2etaplambda) + pr2 * plambda);
+                                    p3 = fg * (pfczl * (rinvijik                  + p2etaplambda) - pr3 * plambda);
+                                    */
+                                    pfczl = pfc*fg*zetalambda[isym];
+                                    plambda *= fg; 
+                                    p1 = (pfczl * (q1 - p2etaplambda) + pr1 * plambda);
+                                    p2 = (pfczl * (q2 - p2etaplambda) + pr2 * plambda);
+                                    p3 = (pfczl * (q3 + p2etaplambda) - pr3 * plambda);
+                                    
                                     // save force contributions in force class
                                     xptr = F->dGdx[index[isym]];
                                     yptr = F->dGdy[index[isym]];
                                     zptr = F->dGdz[index[isym]];
-                                    xptr[Nnum] += p1 * dxij + p2 * dxik;
-                                    yptr[Nnum] += p1 * dyij + p2 * dyik;
-                                    zptr[Nnum] += p1 * dzij + p2 * dzik;
-                                    xptr[j] -= p1 * dxij + p3 * dxjk;
-                                    yptr[j] -= p1 * dyij + p3 * dyjk;
-                                    zptr[j] -= p1 * dzij + p3 * dzjk;
-                                    xptr[k] -= p2 * dxik - p3 * dxjk;
-                                    yptr[k] -= p2 * dyik - p3 * dyjk;
-                                    zptr[k] -= p2 * dzik - p3 * dzjk;
+                                                                          
+                                    p1dxij=p1*dxij; p1dyij=p1*dyij; p1dzij=p1*dzij;
+                                    p2dxik=p2*dxik; p2dyik=p2*dyik; p2dzik=p2*dzik;
+                                    xptr[Nnum] += p1dxij + p2dxik;
+                                    yptr[Nnum] += p1dyij + p2dyik;
+                                    zptr[Nnum] += p1dzij + p2dzik;                   
+                                    p3dxjk=p3*dxjk; p3dyjk=p3*dyjk; p3dzjk=p3*dzjk;                                     
+                                    xptr[k] -= p2dxik - p3dxjk;
+                                    yptr[k] -= p2dyik - p3dyjk;
+                                    zptr[k] -= p2dzik - p3dzjk;
+                                    xptr[j] -= p1dxij + p3dxjk;
+                                    yptr[j] -= p1dyij + p3dyjk;
+                                    zptr[j] -= p1dzij + p3dzjk;
                                 } // isym
                             } // rjk <= rc
                         } // rik <= rc
@@ -3013,6 +3043,7 @@ void PairRuNNer::RuNNer_symfunc::setup(char *line) {
         if(fabs(zeta - round(zeta)) < SMALL_DOUBLE) {
             optpow = round(zeta);
         }
+        //optpow = round(zeta+1);
     }
 
     return;
@@ -3054,6 +3085,8 @@ PairRuNNer::RuNNer_symfuncGroup::RuNNer_symfuncGroup(PairRuNNer& x, int l_num, i
     eta    = NULL;
     zeta   = NULL;
     lambda = NULL;
+    zetalambda = NULL;
+    etaizl = NULL;
     rs     = NULL;
     min    = NULL;
     max    = NULL;
@@ -3070,6 +3103,8 @@ PairRuNNer::RuNNer_symfuncGroup::~RuNNer_symfuncGroup() {
     if(eta    != NULL) delete[] eta   ;
     if(zeta   != NULL) delete[] zeta  ;
     if(lambda != NULL) delete[] lambda;
+    if(zetalambda   != NULL) delete[] zetalambda  ;
+    if(etaizl != NULL) delete[] etaizl  ;    
     if(rs     != NULL) delete[] rs    ;
     if(min    != NULL) delete[] min   ;
     if(max    != NULL) delete[] max   ;
@@ -3102,12 +3137,16 @@ void PairRuNNer::RuNNer_symfuncGroup::setup(int l_type, int l_ec, int l_e1, int 
         eta    = new double[numSF]; 
         zeta   = new double[numSF]; 
         lambda = new double[numSF]; 
+        zetalambda = new double[numSF];
+        etaizl = new double[numSF];
         for(int i=0; i<numSF; i++) {
             optpow[i] = 0  ;
             etaind[i] = 0  ;
             eta   [i] = 0.0;
             zeta  [i] = 0.0;
             lambda[i] = 0.0;
+            zetalambda[i] = 0.0;
+            etaizl[i] = 0.0;
         }
 
     }
@@ -3189,8 +3228,10 @@ void PairRuNNer::RuNNer_symfuncGroup::settype2(int i, double l_eta, double l_rs)
 void PairRuNNer::RuNNer_symfuncGroup::settype3(int i, double l_eta, double l_zeta, double l_lambda, int l_optpow) {
 
     eta   [i] = l_eta   ; 
-    zeta  [i] = l_zeta  ; 
+    zeta  [i] = l_zeta  ;     
     lambda[i] = l_lambda; 
+    zetalambda[i] = l_zeta*l_lambda; // precomputes some products
+    etaizl[i] = 2.0*l_eta/(l_zeta*l_lambda);
     optpow[i] = l_optpow; 
 
     return;

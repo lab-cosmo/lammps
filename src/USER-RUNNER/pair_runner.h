@@ -251,6 +251,8 @@ class PairRuNNer : public Pair {
         double* eta;                                            // SF eta
         double* zeta;                                           // SF zeta
         double* lambda;                                         // SF lambda
+        double* zetalambda;                                     // SF zeta*lambda
+        double* etaizl;                                         // SF 2 eta/(zeta lambda)
         double* rs;                                             // SF shift radius
         double* min;                                            // SF minimum value (scaling.data)
         double* max;                                            // SF maximum value (scaling.data)
@@ -375,5 +377,15 @@ class PairRuNNer : public Pair {
 
 }
 
+inline double fastexp(double x) {
+    // fast exponential by scaling and squaring
+    x /= 1024.; // 2**10
+    // truncated Taylor expansion
+    x = 1.0 + x * (1.0 + 0.5 * x * (1.0 + x * 0.3333333333333333 * (1.0 + 0.25 * x)));
+    x *= x; x *= x; x *= x; x *= x;  
+    x *= x; x *= x; x *= x; x *= x; 
+    x *= x; x *= x;  
+    return x;
+}
 #endif
 #endif
