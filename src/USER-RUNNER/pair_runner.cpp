@@ -2113,8 +2113,8 @@ void PairRuNNer::calc_G_dG_group(int ca, RuNNer_forces *F, RuNNer_symfuncGroup *
                 pdfc = dfc(rij, rcinv);
                 for(int isym=0; isym<numSF; isym++) {
                     // energy calculation
-                    //pexp = exp(-eta[isym] * (rij - rs[isym]) * (rij - rs[isym]));
-                    pexp = fastexp(-eta[isym] * (rij - rs[isym]) * (rij - rs[isym]));
+                    pexp = exp(-eta[isym] * (rij - rs[isym]) * (rij - rs[isym]));
+                    //pexp = fastexp(-eta[isym] * (rij - rs[isym]) * (rij - rs[isym]));
                     value[isym] += pexp * pfc;
                     // force calculation
                     p1 = (pdfc - 2.0 * eta[isym] * (rij - rs[isym]) * pfc) * pexp / rij;
@@ -2187,8 +2187,8 @@ void PairRuNNer::calc_G_dG_group(int ca, RuNNer_forces *F, RuNNer_symfuncGroup *
                                 for(int isym=0; isym<numSF; isym++) {
                                     plambda = 1.0 + lambda[isym] * costijk;
                                     if(etaind[isym] == isym) {
-                                        //vexp = exp(-eta[isym] * r2sum);
-                                        vexp = fastexp(-eta[isym] * r2sum);
+                                        vexp = exp(-eta[isym] * r2sum);
+                                        //vexp = fastexp(-eta[isym] * r2sum);
                                     }
                                     if(plambda <= 0.0) fg = 0.0;
                                     else {
