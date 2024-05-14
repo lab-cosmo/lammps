@@ -102,6 +102,7 @@ PACKAGE = \
 	ml-pace \
 	ml-pod \
 	ml-quip \
+	ml-metatensor \
 	ml-rann \
 	ml-snap \
 	mofff \
@@ -230,6 +231,7 @@ PACKLIB = \
 	plumed \
 	qmmm \
 	ml-quip \
+	ml-metatensor \
 	scafacos \
 	machdyn \
 	vtk \
@@ -247,6 +249,7 @@ PACKEXT = \
 	ml-hdnnp \
 	ml-pace \
 	ml-quip \
+	ml-metatensor \
 	molfile \
 	netcdf \
 	plumed \
