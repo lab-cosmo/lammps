@@ -24,6 +24,8 @@
 #include "neigh_list.h"
 #include "neigh_request.h"
 
+#include <chrono>
+
 using namespace LAMMPS_NS;
 
 /* ---------------------------------------------------------------------- */
@@ -119,6 +121,8 @@ static std::array<int32_t, 3> cell_shifts(
 
 
 void MetatensorSystemAdaptor::setup_neighbors(metatensor_torch::System& system) {
+    auto start = std::chrono::high_resolution_clock::now();
+
     auto dtype = system->positions().scalar_type();
     auto device = system->positions().device();
 
@@ -341,6 +345,10 @@ void MetatensorSystemAdaptor::setup_neighbors(metatensor_torch::System& system) 
         metatensor_torch::register_autograd_neighbors(system, neighbors, options_.check_consistency);
         system->add_neighbor_list(cache.options, neighbors);
     }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    double duration_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    std::cout << "converting LAMMPS => metatensor neighbor lists: " << duration_ns / 1e6 << "ms" << std::endl;
 }
 
 
@@ -349,6 +357,8 @@ metatensor_torch::System MetatensorSystemAdaptor::system_from_lmp(
     torch::ScalarType dtype,
     torch::Device device
 ) {
+    auto start = std::chrono::high_resolution_clock::now();
+
     double** x = atom->x;
     auto total_n_atoms = atom->nlocal + atom->nghost;
 
@@ -395,5 +405,9 @@ metatensor_torch::System MetatensorSystemAdaptor::system_from_lmp(
     );
 
     this->setup_neighbors(system);
+    auto end = std::chrono::high_resolution_clock::now();
+    double duration_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    std::cout << "converting LAMMPS => metatensor system: " << duration_ns / 1e6 << "ms" << std::endl;
+
     return system;
 }

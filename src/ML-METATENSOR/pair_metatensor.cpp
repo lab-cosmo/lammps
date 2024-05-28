@@ -440,6 +440,8 @@ void PairMetatensor::init_list(int id, NeighList *ptr) {
 
 
 void PairMetatensor::compute(int eflag, int vflag) {
+    auto start = std::chrono::high_resolution_clock::now();
+
     if (eflag || vflag) {
         ev_setup(eflag, vflag);
     } else {
@@ -479,11 +481,16 @@ void PairMetatensor::compute(int eflag, int vflag) {
 
     torch::IValue result_ivalue;
     try {
+        auto start = std::chrono::high_resolution_clock::now();
         result_ivalue = mts_data->model->forward({
             std::vector<metatensor_torch::System>{system},
             mts_data->evaluation_options,
             mts_data->check_consistency
         });
+
+        auto end = std::chrono::high_resolution_clock::now();
+        double duration_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+        std::cout << "Model::forward: " << duration_ns / 1e6 << "ms" << std::endl;
     } catch (const std::exception& e) {
         error->all(FLERR, "error evaluating the torch model: {}", e.what());
     }
@@ -518,7 +525,14 @@ void PairMetatensor::compute(int eflag, int vflag) {
     mts_data->system_adaptor->strain.mutable_grad() = torch::Tensor();
 
     // compute forces/virial with backward propagation
+    auto start_bw = std::chrono::high_resolution_clock::now();
+
     energy_tensor.backward(-torch::ones_like(energy_tensor));
+
+    auto end_bw = std::chrono::high_resolution_clock::now();
+    double duration_ns_bw = std::chrono::duration_cast<std::chrono::nanoseconds>(end_bw - start_bw).count();
+    std::cout << "Model::backward: " << duration_ns_bw / 1e6 << "ms" << std::endl;
+
     auto forces_tensor = mts_data->system_adaptor->positions.grad();
     assert(forces_tensor.is_cpu() && forces_tensor.scalar_type() == torch::kFloat64);
 
@@ -548,4 +562,8 @@ void PairMetatensor::compute(int eflag, int vflag) {
     if (vflag_atom) {
         error->all(FLERR, "per atom virial is not implemented");
     }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    double duration_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    std::cout << "LAMMPS::compute: " << duration_ns / 1e6 << "ms" << std::endl;
 }
