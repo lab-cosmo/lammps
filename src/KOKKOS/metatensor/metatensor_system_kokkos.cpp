@@ -14,7 +14,7 @@
 /* ----------------------------------------------------------------------
    Contributing authors: Guillaume Fraux <guillaume.fraux@epfl.ch>
 ------------------------------------------------------------------------- */
-#include "metatensor_system.h"
+#include "metatensor/metatensor_system_kokkos.h"
 
 #include "atom.h"
 #include "domain.h"
@@ -24,11 +24,17 @@
 #include "neigh_list.h"
 #include "neigh_request.h"
 
+#include "kokkos.h"
+#include "atom_kokkos.h"
+
+#include <iostream>
+
 using namespace LAMMPS_NS;
 
 /* ---------------------------------------------------------------------- */
 
-MetatensorSystemAdaptor::MetatensorSystemAdaptor(LAMMPS *lmp, Pair* requestor, MetatensorSystemOptions options):
+template<class LMPDeviceType>
+MetatensorSystemAdaptorKokkos<LMPDeviceType>::MetatensorSystemAdaptorKokkos(LAMMPS *lmp, Pair* requestor, MetatensorSystemOptionsKokkos options):
     Pointers(lmp),
     list_(nullptr),
     options_(std::move(options)),
@@ -45,7 +51,8 @@ MetatensorSystemAdaptor::MetatensorSystemAdaptor(LAMMPS *lmp, Pair* requestor, M
     this->strain = torch::eye(3, torch::TensorOptions().dtype(torch::kFloat64).device(torch::kCPU).requires_grad(true));
 }
 
-MetatensorSystemAdaptor::MetatensorSystemAdaptor(LAMMPS *lmp, Compute* requestor, MetatensorSystemOptions options):
+template<class LMPDeviceType>
+MetatensorSystemAdaptorKokkos<LMPDeviceType>::MetatensorSystemAdaptorKokkos(LAMMPS *lmp, Compute* requestor, MetatensorSystemOptionsKokkos options):
     Pointers(lmp),
     list_(nullptr),
     options_(std::move(options)),
@@ -59,16 +66,19 @@ MetatensorSystemAdaptor::MetatensorSystemAdaptor(LAMMPS *lmp, Compute* requestor
     this->strain = torch::eye(3, torch::TensorOptions().dtype(torch::kFloat64).device(torch::kCPU).requires_grad(true));
 }
 
-MetatensorSystemAdaptor::~MetatensorSystemAdaptor() {
+template<class LMPDeviceType>
+MetatensorSystemAdaptorKokkos<LMPDeviceType>::~MetatensorSystemAdaptorKokkos() {
 
 }
 
-void MetatensorSystemAdaptor::init_list(int id, NeighList* ptr) {
+template<class LMPDeviceType>
+void MetatensorSystemAdaptorKokkos<LMPDeviceType>::init_list(int id, NeighList* ptr) {
     assert(id == 0);
     list_ = ptr;
 }
 
-void MetatensorSystemAdaptor::add_nl_request(double cutoff, metatensor_torch::NeighborListOptions request) {
+template<class LMPDeviceType>
+void MetatensorSystemAdaptorKokkos<LMPDeviceType>::add_nl_request(double cutoff, metatensor_torch::NeighborListOptions request) {
     if (cutoff > options_.interaction_range) {
         error->all(FLERR,
             "Invalid metatensor model: one of the requested neighbor lists "
@@ -118,12 +128,14 @@ static std::array<int32_t, 3> cell_shifts(
 }
 
 
-void MetatensorSystemAdaptor::setup_neighbors(metatensor_torch::System& system) {
+template<class LMPDeviceType>
+void MetatensorSystemAdaptorKokkos<LMPDeviceType>::setup_neighbors(metatensor_torch::System& system) {
+    // std::cout << "MetatensorSystemAdaptorKokkos::setup_neighbors" << std::endl;
     auto dtype = system->positions().scalar_type();
     auto device = system->positions().device();
 
     double** x = atom->x;
-    auto total_n_atoms = atom->nlocal + atom->nghost;
+    auto total_n_atoms = atomKK->nlocal + atomKK->nghost;
 
     auto cell_inv_tensor = system->cell().inverse().t().to(torch::kCPU).to(torch::kFloat64);
     auto cell_inv_accessor = cell_inv_tensor.accessor<double, 2>();
@@ -132,6 +144,8 @@ void MetatensorSystemAdaptor::setup_neighbors(metatensor_torch::System& system) 
         {{cell_inv_accessor[1][0], cell_inv_accessor[1][1], cell_inv_accessor[1][2]}},
         {{cell_inv_accessor[2][0], cell_inv_accessor[2][1], cell_inv_accessor[2][2]}},
     }};
+
+    // auto cell_inv_kokkos = Kokkos::View<double[3][3], Kokkos::MemoryTraits<Kokkos::Unmanaged>>("cell_inv_kokkos", cell_inv_tensor.data_ptr<double>(), tensor.numel());
 
     // Collect the local atom id of all local & ghosts atoms, mapping ghosts
     // atoms which are periodic images of local atoms back to the local atoms.
@@ -344,29 +358,45 @@ void MetatensorSystemAdaptor::setup_neighbors(metatensor_torch::System& system) 
 }
 
 
-metatensor_torch::System MetatensorSystemAdaptor::system_from_lmp(
+template<class LMPDeviceType>
+metatensor_torch::System MetatensorSystemAdaptorKokkos<LMPDeviceType>::system_from_lmp(
     bool do_virial,
     torch::ScalarType dtype,
     torch::Device device
 ) {
-    double** x = atom->x;
-    auto total_n_atoms = atom->nlocal + atom->nghost;
+    // std::cout << "MetatensorSystemAdaptorKokkos::system_from_lmp" << std::endl;
+    auto total_n_atoms = atomKK->nlocal + atomKK->nghost;
 
-    atomic_types_.resize_({total_n_atoms});
-    for (int i=0; i<total_n_atoms; i++) {
-        atomic_types_[i] = options_.types_mapping[atom->type[i]];
-    }
+    auto atom_types_lammps_kokkos = atomKK->k_type.view<LMPDeviceType>();
+    auto mapping = options_.types_mapping_kokkos;
+    Kokkos::View<int32_t*> atom_types_metatensor_kokkos("atom_types_metatensor", total_n_atoms);   /// Can be a class member? (allocation alert)
+    
+    Kokkos::parallel_for(
+        "MetatensorSystemAdaptorKokkos::system_from_lmp::atom_types_mapping",
+        Kokkos::RangePolicy(0, total_n_atoms),
+        KOKKOS_LAMBDA(int i)
+    {
+        atom_types_metatensor_kokkos(i) = mapping(atom_types_lammps_kokkos(i));
+    });
 
-    auto tensor_options = torch::TensorOptions().dtype(torch::kFloat64).device(torch::kCPU);
+    atomic_types_ = torch::from_blob(
+        atom_types_metatensor_kokkos.data(),
+        {total_n_atoms},
+        torch::TensorOptions().dtype(torch::kInt32).device(device)
+    ).clone();  /// Again, allocation alert. Not sure if this can be avoided
+
+    auto tensor_options = torch::TensorOptions().dtype(torch::kFloat64).device(device);
 
     // atom->x contains "real" and then ghost atoms, in that order
+    Kokkos::View<double**> positions_kokkos = atomKK->k_x.view<LMPDeviceType>();
     this->positions = torch::from_blob(
-        *x, {total_n_atoms, 3},
+        positions_kokkos.data(), {total_n_atoms, 3},
         // requires_grad=true since we always need gradients w.r.t. positions
-        tensor_options.requires_grad(true)
-    );
+        tensor_options
+    ).clone().requires_grad_(true);  /// Allocation alert
 
-    auto cell = torch::zeros({3, 3}, tensor_options);
+    auto cell = torch::zeros({3, 3}, tensor_options);  /// Allocation alert, we could make it a class member and allocate it once
+    /// domain doesn't seem to have a Kokkos version
     cell[0][0] = domain->xprd;
 
     cell[1][0] = domain->xy;
@@ -375,12 +405,13 @@ metatensor_torch::System MetatensorSystemAdaptor::system_from_lmp(
     cell[2][0] = domain->xz;
     cell[2][1] = domain->yz;
     cell[2][2] = domain->zprd;
+    /// And the other elements?
 
-    auto system_positions = this->positions.to(dtype).to(device);
-    cell = cell.to(dtype).to(device);
+    auto system_positions = this->positions;
+    cell = cell.to(dtype).to(device);   /// to(device) alert. How do we find the cell on Kokkos?
 
     if (do_virial) {
-        auto model_strain = this->strain.to(dtype).to(device);
+        auto model_strain = this->strain.to(dtype).to(device);  /// to(device) alert, potentially easy to fix
 
         // pretend to scale positions/cell by the strain so that
         // it enters the computational graph.
@@ -389,11 +420,16 @@ metatensor_torch::System MetatensorSystemAdaptor::system_from_lmp(
     }
 
     auto system = torch::make_intrusive<metatensor_torch::SystemHolder>(
-        atomic_types_.to(device),
+        atomic_types_,
         system_positions,
         cell
     );
 
     this->setup_neighbors(system);
     return system;
+}
+
+namespace LAMMPS_NS {
+template class MetatensorNeighborsDataKokkos<LMPDeviceType>;
+template class MetatensorSystemAdaptorKokkos<LMPDeviceType>;
 }

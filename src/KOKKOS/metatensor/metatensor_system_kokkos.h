@@ -11,8 +11,8 @@
    See the README file in the top-level LAMMPS directory.
 ------------------------------------------------------------------------- */
 
-#ifndef LMP_METATENSOR_SYSTEM_H
-#define LMP_METATENSOR_SYSTEM_H
+#ifndef LMP_METATENSOR_SYSTEM_KOKKOS_H
+#define LMP_METATENSOR_SYSTEM_KOKKOS_H
 
 #include <vector>
 #include <array>
@@ -21,15 +21,17 @@
 #include "pointers.h"
 #include "pair.h"
 #include "neigh_list.h"
+#include "kokkos.h"
 
 #include <metatensor/torch/atomistic.hpp>
 
 
 namespace LAMMPS_NS {
 
-struct MetatensorSystemOptions {
+struct MetatensorSystemOptionsKokkos {
     // Mapping from LAMMPS types to metatensor types
     const int32_t* types_mapping;
+    const Kokkos::View<int32_t*> types_mapping_kokkos;
     // interaction range of the model, in LAMMPS units
     double interaction_range;
     // should we run extra checks on the neighbor lists?
@@ -37,7 +39,8 @@ struct MetatensorSystemOptions {
 };
 
 // data for metatensor neighbors lists
-struct MetatensorNeighborsData {
+template<class LMPDeviceType>
+struct MetatensorNeighborsDataKokkos {
     // single neighbors sample containing [i, j, S_a, S_b, S_c]
     using sample_t = std::array<int32_t, 5>;
 
@@ -75,15 +78,17 @@ struct MetatensorNeighborsData {
     std::vector<std::array<float, 3>> distances_f32;
 };
 
-class MetatensorSystemAdaptor : public Pointers {
+template<class LMPDeviceType>
+class MetatensorSystemAdaptorKokkos : public Pointers {
 public:
-    MetatensorSystemAdaptor(LAMMPS* lmp, Pair* requestor, MetatensorSystemOptions options);
-    MetatensorSystemAdaptor(LAMMPS* lmp, Compute* requestor, MetatensorSystemOptions options);
+    MetatensorSystemAdaptorKokkos(LAMMPS* lmp, Pair* requestor, MetatensorSystemOptionsKokkos options);
+    MetatensorSystemAdaptorKokkos(LAMMPS* lmp, Compute* requestor, MetatensorSystemOptionsKokkos options);
 
-    ~MetatensorSystemAdaptor();
+    ~MetatensorSystemAdaptorKokkos();
 
     void init_list(int id, NeighList* ptr);
 
+    
     void add_nl_request(double cutoff, metatensor_torch::NeighborListOptions request);
 
     // Create a metatensor system matching the LAMMPS system data
@@ -101,13 +106,13 @@ private:
     void setup_neighbors(metatensor_torch::System& system);
 
     // options for this system adaptor
-    MetatensorSystemOptions options_;
+    MetatensorSystemOptionsKokkos options_;
 
     // LAMMPS NL
     NeighList* list_;
     // allocations caches for all the NL requested by
     // the model
-    std::vector<MetatensorNeighborsData> caches_;
+    std::vector<MetatensorNeighborsDataKokkos<LMPDeviceType>> caches_;
     // allocation cache for the atomic types in the system
     torch::Tensor atomic_types_;
     // allocation cache holding the "original atom" id for all atoms in the

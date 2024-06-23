@@ -27,6 +27,11 @@
 
 #include "neigh_list.h"
 
+#include "kokkos.h"
+#include "atom_kokkos.h"
+#include "pair_kokkos.h"
+#include "atom_masks.h"
+
 #include <torch/version.h>
 #include <torch/script.h>
 #include <torch/cuda.h>
@@ -40,14 +45,12 @@
 #include <metatensor/torch.hpp>
 #include <metatensor/torch/atomistic.hpp>
 
-#include "metatensor/metatensor_system.h"
-
-#include<iostream>
+#include "metatensor/metatensor_system_kokkos.h"
 
 using namespace LAMMPS_NS;
 
-struct LAMMPS_NS::PairMetatensorKokkosData {
-    PairMetatensorKokkosData(std::string length_unit, std::string energy_unit);
+struct LAMMPS_NS::PairMetatensorDataKokkos {
+    PairMetatensorDataKokkos(std::string length_unit, std::string energy_unit);
 
     void load_model(LAMMPS* lmp, const char* path, const char* extensions_directory);
 
@@ -68,10 +71,10 @@ struct LAMMPS_NS::PairMetatensorKokkosData {
     // allocation cache for the selected atoms
     torch::Tensor selected_atoms_values;
     // adaptor from LAMMPS system to metatensor's
-    std::unique_ptr<MetatensorSystemAdaptor> system_adaptor;
+    std::unique_ptr<MetatensorSystemAdaptorKokkos<LMPDeviceType>> system_adaptor;
 };
 
-PairMetatensorKokkosData::PairMetatensorKokkosData(std::string length_unit, std::string energy_unit):
+PairMetatensorDataKokkos::PairMetatensorDataKokkos(std::string length_unit, std::string energy_unit):
     system_adaptor(nullptr),
     device(torch::kCPU),
     check_consistency(false),
@@ -96,7 +99,7 @@ PairMetatensorKokkosData::PairMetatensorKokkosData(std::string length_unit, std:
     this->evaluation_options->outputs.insert("energy", output);
 }
 
-void PairMetatensorKokkosData::load_model(
+void PairMetatensorDataKokkos::load_model(
     LAMMPS* lmp,
     const char* path,
     const char* extensions_directory
@@ -151,8 +154,8 @@ void PairMetatensorKokkosData::load_model(
 
 /* ---------------------------------------------------------------------- */
 
-PairMetatensorKokkos::PairMetatensorKokkos(LAMMPS *lmp): Pair(lmp), type_mapping(nullptr) {
-    std::cout << "Constructing PairMetatensorKokkos" << std::endl;
+template<class LMPDeviceType>
+PairMetatensorKokkos<LMPDeviceType>::PairMetatensorKokkos(LAMMPS *lmp): Pair(lmp), type_mapping(nullptr) {
     std::string energy_unit;
     std::string length_unit;
     if (strcmp(update->unit_style, "real") == 0) {
@@ -175,10 +178,11 @@ PairMetatensorKokkos::PairMetatensorKokkos(LAMMPS *lmp): Pair(lmp), type_mapping
     // so we can not compute virial as fdotr
     this->no_virial_fdotr_compute = 1;
 
-    this->mts_data = new PairMetatensorKokkosData(std::move(length_unit), std::move(energy_unit));
+    this->mts_data = new PairMetatensorDataKokkos(std::move(length_unit), std::move(energy_unit));
 }
 
-PairMetatensorKokkos::~PairMetatensorKokkos() {
+template<class LMPDeviceType>
+PairMetatensorKokkos<LMPDeviceType>::~PairMetatensorKokkos() {
     delete this->mts_data;
 
     if (allocated) {
@@ -189,7 +193,10 @@ PairMetatensorKokkos::~PairMetatensorKokkos() {
 }
 
 // called when finding `pair_style metatensor` in the input
-void PairMetatensorKokkos::settings(int argc, char ** argv) {
+template<class LMPDeviceType>
+void PairMetatensorKokkos<LMPDeviceType>::settings(int argc, char ** argv) {
+    std::cout << "settings" << std::endl;
+
     if (argc == 0) {
         error->all(FLERR, "expected at least 1 argument to pair_style metatensor, got {}", argc);
     }
@@ -228,6 +235,8 @@ void PairMetatensorKokkos::settings(int argc, char ** argv) {
     }
 
     mts_data->load_model(this->lmp, model_path, extensions_directory);
+
+    /// TODO: Kokkos erroring out!
 
     // Select the device to use based on the model's preference, the user choice
     // and what's available.
@@ -275,7 +284,7 @@ void PairMetatensorKokkos::settings(int argc, char ** argv) {
     if (available_devices.empty()) {
         error->all(FLERR,
             "failed to find a valid device for the model at '{}': "
-            "the model supports {}, none of these where available",
+            "the model supports {}, none of these where available",  /// typo: where -> were
             model_path, torch::str(mts_data->capabilities->supported_devices)
         );
     }
@@ -323,13 +332,20 @@ void PairMetatensorKokkos::settings(int argc, char ** argv) {
     if (!allocated) {
         allocate();
     }
+
+    std::cout << "Running on " << typeid(ExecutionSpaceFromDevice<LMPDeviceType>::space).name() << std::endl;
 }
 
 
-void PairMetatensorKokkos::allocate() {
+template<class LMPDeviceType>
+void PairMetatensorKokkos<LMPDeviceType>::allocate() {
+    std::cout << "allocate" << std::endl;
+
     allocated = 1;
 
     // setflags stores whether the coeff for a given pair of atom types are known
+    /// I'm tempted to change this one to kokkos but I can't find how it's used
+    /// Commented out for now
     setflag = memory->create(
         setflag,
         atom->ntypes + 1,
@@ -343,6 +359,9 @@ void PairMetatensorKokkos::allocate() {
         }
     }
 
+    /// I noticed that this cutsq isn't used in the code and is not
+    /// necessary to run it. Commented out for now
+
     // cutsq stores the squared cutoff for each pair
     cutsq = memory->create(
         cutsq,
@@ -353,6 +372,7 @@ void PairMetatensorKokkos::allocate() {
 
     // lammps_types_to_species stores the mapping from lammps atom types to
     // the metatensor model species
+    /// This will stay non-kokkos for now (only used at initialization)
     type_mapping = memory->create(
         type_mapping,
         atom->ntypes + 1,
@@ -364,13 +384,17 @@ void PairMetatensorKokkos::allocate() {
     }
 }
 
-double PairMetatensorKokkos::init_one(int, int) {
+template<class LMPDeviceType>
+double PairMetatensorKokkos<LMPDeviceType>::init_one(int, int) {
+    std::cout << "init_one" << std::endl;
     return mts_data->interaction_range;
 }
 
 
 // called on pair_coeff
-void PairMetatensorKokkos::coeff(int argc, char ** argv) {
+template<class LMPDeviceType>
+void PairMetatensorKokkos<LMPDeviceType>::coeff(int argc, char ** argv) {
+    std::cout << "coeff" << std::endl;
     if (argc < 3 || strcmp(argv[0], "*") != 0 || strcmp(argv[1], "*") != 0) {
         error->all(FLERR, "invalid pair_coeff, expected `pair_coeff * * <list of types>`");
     }
@@ -398,11 +422,14 @@ void PairMetatensorKokkos::coeff(int argc, char ** argv) {
 
 
 // called when the run starts
-void PairMetatensorKokkos::init_style() {
+template<class LMPDeviceType>
+void PairMetatensorKokkos<LMPDeviceType>::init_style() {
+    std::cout << "init_style" << std::endl;
     // Require newton pair on since we need to communicate forces accumulated on
     // ghost atoms to neighboring domains. These forces contributions come from
     // gradient of a local descriptor w.r.t. domain ghosts (periodic images
     // ghosts are handled separately).
+    /// Would be good if we could change this because Newton off is the Kokkos default
     if (force->newton_pair != 1) {
         error->all(FLERR, "Pair style metatensor requires newton pair on");
     }
@@ -417,13 +444,23 @@ void PairMetatensorKokkos::init_style() {
         mts_data->interaction_range = range;
     }
 
+    /// create Kokkos view for type_mapping
+    Kokkos::View<int32_t*> type_mapping_kokkos("type_mapping", atom->ntypes + 1);
+    /// copy type_mapping to Kokkos view
+    auto type_mapping_kokkos_host = Kokkos::create_mirror_view(type_mapping_kokkos);
+    for (int i = 0; i < atom->ntypes + 1; i++) {
+        type_mapping_kokkos_host(i) = type_mapping[i];
+    }
+    Kokkos::deep_copy(type_mapping_kokkos, type_mapping_kokkos_host);
+
     // create system adaptor
-    auto options = MetatensorSystemOptions{
+    auto options = MetatensorSystemOptionsKokkos{
         this->type_mapping,
+        type_mapping_kokkos,
         mts_data->interaction_range,
         mts_data->check_consistency,
     };
-    mts_data->system_adaptor = std::make_unique<MetatensorSystemAdaptor>(lmp, this, options);
+    mts_data->system_adaptor = std::make_unique<MetatensorSystemAdaptorKokkos<LMPDeviceType>>(lmp, this, options);
 
     // Translate from the metatensor neighbor lists requests to LAMMPS neighbor
     // lists requests.
@@ -437,12 +474,30 @@ void PairMetatensorKokkos::init_style() {
 }
 
 
-void PairMetatensorKokkos::init_list(int id, NeighList *ptr) {
+template<class LMPDeviceType>
+void PairMetatensorKokkos<LMPDeviceType>::init_list(int id, NeighList *ptr) {
+    std::cout << "init_list" << std::endl;
     mts_data->system_adaptor->init_list(id, ptr);
 }
 
 
-void PairMetatensorKokkos::compute(int eflag, int vflag) {
+template<class LMPDeviceType>
+void PairMetatensorKokkos<LMPDeviceType>::compute(int eflag, int vflag) {
+    // auto x = atomKK->k_x.view<LMPDeviceType>();
+    // auto h_array = Kokkos::create_mirror_view(d_array);
+    // Kokkos::deep_copy(h_array, d_array);
+    // // Print the values on the host
+    // for (int i = 0; i < 32; ++i) {
+    //     for (int j = 0; j < 3; ++j) {
+    //         std::cout << h_array(i, j) << " ";
+    //     }
+    //     std::cout << std::endl;
+    // }
+
+    /// Declare what we need to read from the atomKK object and what we will modify
+    atomKK->sync(ExecutionSpaceFromDevice<LMPDeviceType>::space, X_MASK | F_MASK | TAG_MASK | TYPE_MASK | ENERGY_MASK | VIRIAL_MASK);
+    this->atomKK->modified(ExecutionSpaceFromDevice<LMPDeviceType>::space, F_MASK);
+
     if (eflag || vflag) {
         ev_setup(eflag, vflag);
     } else {
@@ -525,12 +580,15 @@ void PairMetatensorKokkos::compute(int eflag, int vflag) {
     auto forces_tensor = mts_data->system_adaptor->positions.grad();
     assert(forces_tensor.is_cpu() && forces_tensor.scalar_type() == torch::kFloat64);
 
-    auto forces = forces_tensor.accessor<double, 2>();
-    for (int i=0; i<atom->nlocal + atom->nghost; i++) {
-        atom->f[i][0] += forces[i][0];
-        atom->f[i][1] += forces[i][1];
-        atom->f[i][2] += forces[i][2];
-    }
+    auto forces_lammps_kokkos = this->atomKK->k_f.view<LMPDeviceType>();
+    /// Is it possible to do double*[3] here?
+    auto forces_metatensor_kokkos = Kokkos::View<double**, Kokkos::LayoutRight, LMPDeviceType>(forces_tensor.contiguous().data_ptr<double>(), atom->nlocal + atom->nghost, 3);
+
+    Kokkos::parallel_for("PairMetatensorKokkos::compute::force_accumulation", atom->nlocal + atom->nghost, KOKKOS_LAMBDA(const int i) {
+        forces_lammps_kokkos(i, 0) += forces_metatensor_kokkos(i, 0);
+        forces_lammps_kokkos(i, 1) += forces_metatensor_kokkos(i, 1);
+        forces_lammps_kokkos(i, 2) += forces_metatensor_kokkos(i, 2);
+    });
 
     assert(!vflag_fdotr);
 
@@ -551,4 +609,9 @@ void PairMetatensorKokkos::compute(int eflag, int vflag) {
     if (vflag_atom) {
         error->all(FLERR, "per atom virial is not implemented");
     }
+}   
+
+namespace LAMMPS_NS {
+template class PairMetatensorKokkos<LMPDeviceType>;
+/// TODO: Host version
 }

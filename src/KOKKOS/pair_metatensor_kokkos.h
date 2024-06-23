@@ -12,7 +12,7 @@
 ------------------------------------------------------------------------- */
 #ifdef PAIR_CLASS
 // clang-format off
-PairStyle(metatensor/kk, PairMetatensorKokkos);
+PairStyle(metatensor/kk, PairMetatensorKokkos<LMPDeviceType>);
 // clang-format on
 #else
 
@@ -22,9 +22,16 @@ PairStyle(metatensor/kk, PairMetatensorKokkos);
 #include "pair.h"
 
 namespace LAMMPS_NS {
-class MetatensorSystemAdaptor;
-struct PairMetatensorKokkosData;
 
+template<class LMPDeviceType>
+class MetatensorSystemAdaptorKokkos;
+
+struct PairMetatensorDataKokkos;
+
+/// I noticed that most other kokkos packages inherit from their non-kokkos
+/// counterparts. It doesn't look like a good idea to me because
+/// they end up overriding everything... Not doing it here for now.
+template<class LMPDeviceType>
 class PairMetatensorKokkos : public Pair {
 public:
     PairMetatensorKokkos(class LAMMPS *);
@@ -39,7 +46,7 @@ public:
 
     void allocate();
 private:
-    PairMetatensorKokkosData* mts_data;
+    PairMetatensorDataKokkos* mts_data;
 
     // mapping from LAMMPS types to metatensor types
     int32_t* type_mapping;
