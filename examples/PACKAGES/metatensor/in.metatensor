@@ -12,7 +12,6 @@ mass Ni 58.693
 
 velocity all create 123 42
 
-
 pair_style metatensor nickel-lj.pt
 # pair_style metatensor nickel-lj-extensions.pt extensions collected-extensions/
 pair_coeff * * 28
