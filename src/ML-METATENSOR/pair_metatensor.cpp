@@ -523,7 +523,7 @@ void PairMetatensor::compute(int eflag, int vflag) {
         auto samples_values = energy_samples->values().to(torch::kCPU);
         auto samples = samples_values.accessor<int32_t, 2>();
 
-        int64_t n_atoms = atom->nlocal + atom->nghost;
+        // int64_t n_atoms = atom->nlocal + atom->nghost;
         assert(samples_values.sizes() == mts_data->selected_atoms_values.sizes());
 
         auto energies = energy_detached.accessor<double, 2>();

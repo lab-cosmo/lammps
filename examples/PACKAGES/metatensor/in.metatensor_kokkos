@@ -14,7 +14,7 @@ velocity all create 123 42
 
 run_style verlet/kk
 
-pair_style metatensor/kk nickel-lj.pt
+pair_style metatensor/kk nickel-lj.pt device cuda
 pair_coeff * * 28
 
 timestep 0.001

@@ -47,6 +47,12 @@
 
 #include "metatensor/metatensor_system_kokkos.h"
 
+#ifndef KOKKOS_ENABLE_CUDA
+namespace Kokkos {
+class Cuda {};
+} // namespace Kokkos
+#endif // KOKKOS_ENABLE_CUDA
+
 using namespace LAMMPS_NS;
 
 struct LAMMPS_NS::PairMetatensorDataKokkos {
@@ -236,8 +242,6 @@ void PairMetatensorKokkos<LMPDeviceType>::settings(int argc, char ** argv) {
 
     mts_data->load_model(this->lmp, model_path, extensions_directory);
 
-    /// TODO: Kokkos erroring out!
-
     // Select the device to use based on the model's preference, the user choice
     // and what's available.
     auto available_devices = std::vector<torch::Device>();
@@ -320,6 +324,17 @@ void PairMetatensorKokkos<LMPDeviceType>::settings(int argc, char ** argv) {
     }
 
     mts_data->model->to(mts_data->device);
+
+    // Handle potential mismatch between Kokkos and model devices
+    if (std::is_same<LMPDeviceType, Kokkos::Cuda>::value) {
+        if (!mts_data->device.is_cuda()) {
+            throw std::runtime_error("Kokkos is running on a GPU, but the model is not on a GPU");
+        }
+    } else {
+        if (!mts_data->device.is_cpu()) {
+            throw std::runtime_error("Kokkos is running on the host, but the model is not on CPU");
+        }
+    }
 
     auto message = "Running simulation on " + mts_data->device.str() + " device with " + mts_data->capabilities->dtype() + " data";
     if (screen) {
@@ -445,8 +460,8 @@ void PairMetatensorKokkos<LMPDeviceType>::init_style() {
     }
 
     /// create Kokkos view for type_mapping
-    Kokkos::View<int32_t*> type_mapping_kokkos("type_mapping", atom->ntypes + 1);
-    /// copy type_mapping to Kokkos view
+    Kokkos::View<int32_t*, Kokkos::LayoutRight, LMPDeviceType> type_mapping_kokkos("type_mapping", atom->ntypes + 1);
+    /// copy type_mapping to the Kokkos view (via a host mirror view)
     auto type_mapping_kokkos_host = Kokkos::create_mirror_view(type_mapping_kokkos);
     for (int i = 0; i < atom->ntypes + 1; i++) {
         type_mapping_kokkos_host(i) = type_mapping[i];
@@ -454,7 +469,7 @@ void PairMetatensorKokkos<LMPDeviceType>::init_style() {
     Kokkos::deep_copy(type_mapping_kokkos, type_mapping_kokkos_host);
 
     // create system adaptor
-    auto options = MetatensorSystemOptionsKokkos{
+    auto options = MetatensorSystemOptionsKokkos<LMPDeviceType>{
         this->type_mapping,
         type_mapping_kokkos,
         mts_data->interaction_range,
@@ -478,6 +493,7 @@ template<class LMPDeviceType>
 void PairMetatensorKokkos<LMPDeviceType>::init_list(int id, NeighList *ptr) {
     std::cout << "init_list" << std::endl;
     mts_data->system_adaptor->init_list(id, ptr);
+    std::cout << "init_list done" << std::endl;
 }
 
 
@@ -496,7 +512,7 @@ void PairMetatensorKokkos<LMPDeviceType>::compute(int eflag, int vflag) {
 
     /// Declare what we need to read from the atomKK object and what we will modify
     atomKK->sync(ExecutionSpaceFromDevice<LMPDeviceType>::space, X_MASK | F_MASK | TAG_MASK | TYPE_MASK | ENERGY_MASK | VIRIAL_MASK);
-    this->atomKK->modified(ExecutionSpaceFromDevice<LMPDeviceType>::space, F_MASK);
+    this->atomKK->modified(ExecutionSpaceFromDevice<LMPDeviceType>::space, ENERGY_MASK | F_MASK | VIRIAL_MASK);
 
     if (eflag || vflag) {
         ev_setup(eflag, vflag);
@@ -578,11 +594,11 @@ void PairMetatensorKokkos<LMPDeviceType>::compute(int eflag, int vflag) {
     // compute forces/virial with backward propagation
     energy_tensor.backward(-torch::ones_like(energy_tensor));
     auto forces_tensor = mts_data->system_adaptor->positions.grad();
-    assert(forces_tensor.is_cpu() && forces_tensor.scalar_type() == torch::kFloat64);
+    assert(forces_tensor.scalar_type() == torch::kFloat64);
 
     auto forces_lammps_kokkos = this->atomKK->k_f.view<LMPDeviceType>();
     /// Is it possible to do double*[3] here?
-    auto forces_metatensor_kokkos = Kokkos::View<double**, Kokkos::LayoutRight, LMPDeviceType>(forces_tensor.contiguous().data_ptr<double>(), atom->nlocal + atom->nghost, 3);
+    auto forces_metatensor_kokkos = Kokkos::View<double**, Kokkos::LayoutRight, LMPDeviceType, Kokkos::MemoryTraits<Kokkos::Unmanaged>>(forces_tensor.contiguous().data_ptr<double>(), atom->nlocal + atom->nghost, 3);
 
     Kokkos::parallel_for("PairMetatensorKokkos::compute::force_accumulation", atom->nlocal + atom->nghost, KOKKOS_LAMBDA(const int i) {
         forces_lammps_kokkos(i, 0) += forces_metatensor_kokkos(i, 0);
@@ -594,8 +610,12 @@ void PairMetatensorKokkos<LMPDeviceType>::compute(int eflag, int vflag) {
 
     if (vflag_global) {
         auto virial_tensor = mts_data->system_adaptor->strain.grad();
-        assert(virial_tensor.is_cpu() && forces_tensor.scalar_type() == torch::kFloat64);
-        auto predicted_virial = virial_tensor.accessor<double, 2>();
+        assert(virial_tensor.scalar_type() == torch::kFloat64);
+
+        // apparently the cell is not supported in Kokkos format,
+        // so it has to be updated on CPU (??)
+        auto predicted_virial_tensor_cpu = virial_tensor.cpu();
+        auto predicted_virial = predicted_virial_tensor_cpu.accessor<double, 2>();
 
         virial[0] += predicted_virial[0][0];
         virial[1] += predicted_virial[1][1];

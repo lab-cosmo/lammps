@@ -1,0 +1,695 @@
+LAMMPS (17 Apr 2024 - Development - patch_27Oct2021-10499-g9eaf5e7e1a-modified)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+Lattice spacing in x,y,z = 3.6 3.6 3.6
+Created orthogonal box = (0 0 0) to (7.2 7.2 7.2)
+  1 by 1 by 1 MPI processor grid
+Created 32 atoms
+  using lattice units in orthogonal box = (0 0 0) to (7.2 7.2 7.2)
+  create_atoms CPU = 0.000 seconds
+
+This is the Test Lennard-Jones model
+====================================
+
+Minimal shifted Lennard-Jones potential, to be used when testing the
+integration of metatensor atomistic models with various simulation engines.
+
+Model authors
+-------------
+
+- Guillaume Fraux <guillaume.fraux@epfl.ch>
+
+Model references
+----------------
+
+Please cite the following references when using this model:
+- about this specific model:
+  * https://github.com/luthaf/metatensor-lj-test
+- about the implementation of this model:
+  * https://github.com/lab-cosmo/metatensor
+
+Running simulation on cpu device with float64 data
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+- Type Label Framework: https://doi.org/10.1021/acs.jpcb.3c08419
+- https://github.com/lab-cosmo/metatensor
+- https://github.com/luthaf/metatensor-lj-test
+The log file lists these citations in BibTeX format.
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 8.5
+  ghost atom cutoff = 8.5
+  binsize = 4.25, bins = 2 2 2
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair metatensor, perpetual
+      attributes: full, newton on, ghost
+      pair build: full/bin/ghost
+      stencil: full/ghost/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+convert neighbors took 16.3425ms
+convert system took 17.1741ms
+model forward took 38.8414ms
+model backward took 0.409679ms
+PairMetatensor::compute took 56.5816ms
+Per MPI rank memory allocation (min/avg/max) = 3.377 | 3.377 | 3.377 Mbytes
+   Step          Temp          PotEng         TotEng         Press          Volume    
+         0   123           -8.2814195     -7.7885506     -67585.536      373.248      
+convert neighbors took 15.9165ms
+convert system took 16.4974ms
+model forward took 26.9742ms
+model backward took 1.6793ms
+PairMetatensor::compute took 45.3062ms
+         1   123.5848      -8.3905841     -7.8953718     -68875.356      370.73791    
+convert neighbors took 15.6257ms
+convert system took 16.1522ms
+model forward took 1.27574ms
+model backward took 4.53147ms
+PairMetatensor::compute took 22.0794ms
+         2   125.36984     -8.7286113     -8.2262462     -72914.728      363.25298    
+convert neighbors took 15.3253ms
+convert system took 15.8451ms
+model forward took 0.580439ms
+model backward took 0.324164ms
+PairMetatensor::compute took 16.8579ms
+         3   128.44099     -9.3270716     -8.8124003     -80229.336      350.96881    
+convert neighbors took 22.3771ms
+convert system took 22.9033ms
+model forward took 0.634544ms
+model backward took 0.361721ms
+PairMetatensor::compute took 24.0108ms
+         4   132.92309     -10.238056     -9.7054247     -92646.276      334.30189    
+convert neighbors took 23.5879ms
+convert system took 24.1135ms
+model forward took 0.618979ms
+model backward took 0.407597ms
+PairMetatensor::compute took 25.2431ms
+         5   138.93301     -11.542195     -10.985482     -110018.47      314.00298    
+convert neighbors took 23.7262ms
+convert system took 24.2751ms
+model forward took 0.694591ms
+model backward took 0.45428ms
+PairMetatensor::compute took 25.5452ms
+         6   146.49133     -13.292952     -12.705952     -134325.98      291.33526    
+convert neighbors took 26.4944ms
+convert system took 27.3115ms
+model forward took 0.768289ms
+model backward took 0.461514ms
+PairMetatensor::compute took 28.6588ms
+         7   155.47222     -15.521683     -14.898695     -167065.97      267.89334    
+convert neighbors took 26.4286ms
+convert system took 27.2265ms
+model forward took 0.802599ms
+model backward took 0.441809ms
+PairMetatensor::compute took 28.6046ms
+         8   165.60721     -18.21248      -17.548881     -208252.12      245.14944    
+convert neighbors took 32.2789ms
+convert system took 33.155ms
+model forward took 0.839373ms
+model backward took 0.500854ms
+PairMetatensor::compute took 34.6204ms
+         9   176.64015     -21.328372     -20.620563     -258630.97      223.94897    
+convert neighbors took 32.8669ms
+convert system took 33.7394ms
+model forward took 0.884573ms
+model backward took 0.547064ms
+PairMetatensor::compute took 35.3009ms
+        10   188.53759     -24.882492     -24.12701      -315103.23      204.30001    
+convert neighbors took 37.1794ms
+convert system took 38.0165ms
+model forward took 0.847646ms
+model backward took 0.667863ms
+PairMetatensor::compute took 39.6542ms
+        11   201.46079     -28.934881     -28.127615     -377443.23      185.76227    
+convert neighbors took 40.6879ms
+convert system took 41.4886ms
+model forward took 0.845942ms
+model backward took 0.544094ms
+PairMetatensor::compute took 42.9892ms
+        12   215.46663     -33.52033      -32.656942     -436590.77      167.94825    
+convert neighbors took 42.0171ms
+convert system took 42.8243ms
+model forward took 0.858029ms
+model backward took 0.559005ms
+PairMetatensor::compute took 44.3586ms
+        13   229.80381     -38.406911     -37.486072     -465991.27      150.955      
+convert neighbors took 45.3761ms
+convert system took 46.1761ms
+model forward took 0.839052ms
+model backward took 0.665157ms
+PairMetatensor::compute took 47.8039ms
+        14   241.91733     -42.799872     -41.830494     -408477         135.44711    
+convert neighbors took 61.5382ms
+convert system took 62.7724ms
+model forward took 0.991535ms
+model backward took 0.728595ms
+PairMetatensor::compute took 64.6186ms
+        15   246.73106     -45.412349     -44.423681     -185459.96      122.43331    
+convert neighbors took 60.0389ms
+convert system took 61.1933ms
+model forward took 1.20664ms
+model backward took 0.867555ms
+PairMetatensor::compute took 63.4284ms
+        16   237.92168     -45.419788     -44.466421      220702.92      112.96254    
+convert neighbors took 65.6917ms
+convert system took 66.9315ms
+model forward took 1.31911ms
+model backward took 0.845484ms
+PairMetatensor::compute took 69.2481ms
+        17   212.95064     -44.070027     -43.21672       595571.42      107.90916    
+convert neighbors took 68.1465ms
+convert system took 69.3653ms
+model forward took 1.02359ms
+model backward took 0.730052ms
+PairMetatensor::compute took 71.2399ms
+        18   178.07682     -43.765731     -43.052166      642512.61      107.48103    
+convert neighbors took 62.322ms
+convert system took 63.4677ms
+model forward took 1.15872ms
+model backward took 0.828309ms
+PairMetatensor::compute took 65.6ms
+        19   144.14669     -44.665377     -44.087771      389082.18      110.7221     
+convert neighbors took 63.6165ms
+convert system took 64.8403ms
+model forward took 0.99366ms
+model backward took 0.715122ms
+PairMetatensor::compute took 66.6707ms
+        20   117.56132     -45.287021     -44.815945      95105.189      115.71314    
+convert neighbors took 61.5513ms
+convert system took 62.7338ms
+model forward took 1.08911ms
+model backward took 0.757537ms
+PairMetatensor::compute took 64.7083ms
+        21   98.619242     -45.189386     -44.794212     -99218.031      120.46711    
+convert neighbors took 64.2603ms
+convert system took 65.4961ms
+model forward took 1.10166ms
+model backward took 0.778335ms
+PairMetatensor::compute took 67.4941ms
+        22   85.198104     -44.837994     -44.4966       -194860.87      123.67793    
+convert neighbors took 62.9109ms
+convert system took 64.0521ms
+model forward took 1.12098ms
+model backward took 0.871218ms
+PairMetatensor::compute took 66.1844ms
+        23   75.232927     -44.644581     -44.343118     -223034.09      124.85838    
+convert neighbors took 63.593ms
+convert system took 64.8142ms
+model forward took 1.0167ms
+model backward took 0.692459ms
+PairMetatensor::compute took 66.6502ms
+        24   67.294761     -44.70885      -44.439196     -202654.42      124.13812    
+convert neighbors took 60.7981ms
+convert system took 61.929ms
+model forward took 1.11102ms
+model backward took 0.78715ms
+PairMetatensor::compute took 63.9614ms
+        25   60.565247     -44.90778      -44.665091     -140822.33      122.04254    
+convert neighbors took 65.5882ms
+convert system took 66.812ms
+model forward took 1.04022ms
+model backward took 0.745324ms
+PairMetatensor::compute took 68.7437ms
+        26   54.812228     -45.045099     -44.825463     -44999.698      119.32602    
+convert neighbors took 63.8179ms
+convert system took 64.9668ms
+model forward took 1.18027ms
+model backward took 0.863167ms
+PairMetatensor::compute took 67.1504ms
+        27   50.401866     -45.015644     -44.813681      63303.009      116.80484    
+convert neighbors took 64.6958ms
+convert system took 65.9506ms
+model forward took 0.989522ms
+model backward took 0.719571ms
+PairMetatensor::compute took 67.8101ms
+        28   48.11081      -44.899815     -44.707032      145814.95      115.15799    
+convert neighbors took 60.848ms
+convert system took 61.9933ms
+model forward took 1.33364ms
+model backward took 0.767237ms
+PairMetatensor::compute took 64.2223ms
+        29   48.587446     -44.860769     -44.666076      168168.89      114.73816    
+convert neighbors took 61.5787ms
+convert system took 62.8187ms
+model forward took 1.0542ms
+model backward took 0.707601ms
+PairMetatensor::compute took 64.6957ms
+        30   51.817654     -44.942546     -44.734909      127795.92      115.48016    
+convert neighbors took 62.1653ms
+convert system took 63.3019ms
+model forward took 1.00438ms
+model backward took 0.723457ms
+PairMetatensor::compute took 65.1504ms
+        31   57.152757     -45.047959     -44.818944      53729.41       116.96671    
+convert neighbors took 64.0625ms
+convert system took 65.2738ms
+model forward took 1.02162ms
+model backward took 0.729086ms
+PairMetatensor::compute took 67.1405ms
+        32   63.820902     -45.091885     -44.83615      -19672.539      118.62034    
+convert neighbors took 60.2021ms
+convert system took 61.3322ms
+model forward took 1.07567ms
+model backward took 0.775065ms
+PairMetatensor::compute took 63.3058ms
+        33   71.343617     -45.085062     -44.799183     -71717.69       119.91642    
+convert neighbors took 62.254ms
+convert system took 63.4725ms
+model forward took 1.01915ms
+model backward took 0.797193ms
+PairMetatensor::compute took 65.4204ms
+        34   79.595651     -45.086549     -44.767604     -95709.602      120.52528    
+convert neighbors took 60.4231ms
+convert system took 61.8024ms
+model forward took 1.05197ms
+model backward took 0.793467ms
+PairMetatensor::compute took 63.7761ms
+        35   88.656655     -45.132782     -44.777529     -92335.782      120.35954    
+convert neighbors took 63.1079ms
+convert system took 64.3362ms
+model forward took 1.0286ms
+model backward took 0.763061ms
+PairMetatensor::compute took 66.2464ms
+        36   98.630751     -45.212823     -44.817603     -65686.671      119.55119    
+convert neighbors took 62.3102ms
+convert system took 63.4671ms
+model forward took 1.05025ms
+model backward took 0.755727ms
+PairMetatensor::compute took 65.3981ms
+        37   109.49393     -45.288969     -44.85022      -23193.235      118.38748    
+convert neighbors took 63.5353ms
+convert system took 64.7559ms
+model forward took 1.08404ms
+model backward took 0.767404ms
+PairMetatensor::compute took 66.7359ms
+        38   120.98513     -45.335347     -44.850552      23292.032      117.22179    
+convert neighbors took 61.9828ms
+convert system took 63.2085ms
+model forward took 1.10003ms
+model backward took 0.774159ms
+PairMetatensor::compute took 65.2152ms
+        39   132.58017     -45.360259     -44.829002      59041.036      116.37278    
+convert neighbors took 62.7366ms
+convert system took 63.9766ms
+model forward took 1.00318ms
+model backward took 0.781068ms
+PairMetatensor::compute took 65.8856ms
+        40   143.59691     -45.390782     -44.81538       72237.361      116.03468    
+convert neighbors took 61.1856ms
+convert system took 62.337ms
+model forward took 1.2904ms
+model backward took 0.726832ms
+PairMetatensor::compute took 64.4742ms
+        41   153.41334     -45.438412     -44.823675      60358.357      116.22839    
+convert neighbors took 61.544ms
+convert system took 62.6922ms
+model forward took 1.05726ms
+model backward took 0.738593ms
+PairMetatensor::compute took 64.6091ms
+        42   161.67652     -45.488484     -44.840636      31097.657      116.8124     
+convert neighbors took 62.9351ms
+convert system took 64.0929ms
+model forward took 1.16616ms
+model backward took 0.807218ms
+PairMetatensor::compute took 66.2138ms
+        43   168.3681      -45.522049     -44.847387     -2988.2383      117.5469     
+convert neighbors took 107.954ms
+convert system took 109.163ms
+model forward took 1.09188ms
+model backward took 0.773533ms
+PairMetatensor::compute took 111.171ms
+        44   173.70598     -45.537127     -44.841076     -30840.366      118.1812     
+convert neighbors took 65.6398ms
+convert system took 66.8482ms
+model forward took 1.10601ms
+model backward took 0.815514ms
+PairMetatensor::compute took 68.8935ms
+        45   177.97514     -45.546355     -44.833197     -45942.953      118.52962    
+convert neighbors took 63.3677ms
+convert system took 64.6209ms
+model forward took 1.06002ms
+model backward took 0.74172ms
+PairMetatensor::compute took 66.5553ms
+        46   181.3887      -45.560981     -44.834145     -46281.296      118.51484    
+convert neighbors took 64.2122ms
+convert system took 65.4144ms
+model forward took 1.03897ms
+model backward took 0.717297ms
+PairMetatensor::compute took 67.2919ms
+        47   184.02335     -45.580574     -44.84318      -33388.62       118.17466    
+convert neighbors took 61.0153ms
+convert system took 62.1885ms
+model forward took 1.13481ms
+model backward took 0.786958ms
+PairMetatensor::compute took 64.2432ms
+        48   185.8274      -45.596009     -44.851386     -11693.633      117.63804    
+convert neighbors took 62.429ms
+convert system took 63.7277ms
+model forward took 1.01071ms
+model backward took 0.724674ms
+PairMetatensor::compute took 65.5845ms
+        49   186.68291     -45.600097     -44.852047      12113.178      117.08021    
+convert neighbors took 61.7285ms
+convert system took 62.8743ms
+model forward took 1.12223ms
+model backward took 0.747882ms
+PairMetatensor::compute took 64.9513ms
+        50   186.4957      -45.594664     -44.847363      30576.588      116.66838    
+convert neighbors took 63.875ms
+convert system took 65.0325ms
+model forward took 1.04835ms
+model backward took 0.767296ms
+PairMetatensor::compute took 66.9758ms
+        51   185.27612     -45.587329     -44.844916      38021.102      116.51256    
+convert neighbors took 59.9402ms
+convert system took 61.0954ms
+model forward took 1.02782ms
+model backward took 0.760405ms
+PairMetatensor::compute took 63.011ms
+        52   183.17308     -45.582631     -44.848645      32907.006      116.63647    
+convert neighbors took 63.7669ms
+convert system took 64.9329ms
+model forward took 1.04601ms
+model backward took 0.780694ms
+PairMetatensor::compute took 66.8843ms
+        53   180.4467      -45.578225     -44.855163      18278.713      116.9776     
+convert neighbors took 60.729ms
+convert system took 61.8695ms
+model forward took 1.03361ms
+model backward took 0.706777ms
+PairMetatensor::compute took 63.7262ms
+        54   177.39959     -45.569639     -44.858788     -32.53218       117.41497    
+convert neighbors took 64.4292ms
+convert system took 65.5725ms
+model forward took 1.11193ms
+model backward took 0.740828ms
+PairMetatensor::compute took 67.5474ms
+        55   174.30551     -45.556435     -44.857982     -16042.425      117.81221    
+convert neighbors took 62.3248ms
+convert system took 63.4681ms
+model forward took 1.12359ms
+model backward took 0.825578ms
+PairMetatensor::compute took 65.5644ms
+        56   171.36427     -45.542662     -44.855995     -25504.518      118.05994    
+convert neighbors took 62.592ms
+convert system took 63.8236ms
+model forward took 1.06214ms
+model backward took 0.715754ms
+PairMetatensor::compute took 65.7586ms
+        57   168.6903      -45.53247      -44.856517     -26604.604      118.10445    
+convert neighbors took 60.5954ms
+convert system took 61.731ms
+model forward took 1.17357ms
+model backward took 0.747769ms
+PairMetatensor::compute took 63.7764ms
+        58   166.32633     -45.526401     -44.859921     -19889.877      117.95691    
+convert neighbors took 65.6057ms
+convert system took 66.8305ms
+model forward took 1.01902ms
+model backward took 0.746361ms
+PairMetatensor::compute took 68.7222ms
+        59   164.26991     -45.521819     -44.863579     -7887.6516      117.68356    
+convert neighbors took 63.4339ms
+convert system took 64.6073ms
+model forward took 1.10957ms
+model backward took 0.832492ms
+PairMetatensor::compute took 66.6839ms
+        60   162.50164     -45.516281     -44.865127      5525.3228      117.38153    
+convert neighbors took 64.68ms
+convert system took 65.9238ms
+model forward took 0.991574ms
+model backward took 0.718925ms
+PairMetatensor::compute took 67.7475ms
+        61   161.00715     -45.51008      -44.864914      16150.632      117.14771    
+convert neighbors took 61.3146ms
+convert system took 62.4514ms
+model forward took 1.02223ms
+model backward took 0.793125ms
+PairMetatensor::compute took 64.3914ms
+        62   159.78826     -45.50549      -44.865208      20809.56       117.04976    
+convert neighbors took 61.7632ms
+convert system took 62.9845ms
+model forward took 0.987489ms
+model backward took 0.739457ms
+PairMetatensor::compute took 64.8347ms
+        63   158.86347     -45.503978     -44.867402      18469.38       117.10768    
+convert neighbors took 60.7568ms
+convert system took 61.9125ms
+model forward took 1.34829ms
+model backward took 0.714069ms
+PairMetatensor::compute took 64.1045ms
+        64   158.26166     -45.50477      -44.870606      10513.116      117.29159    
+convert neighbors took 61.0003ms
+convert system took 62.1672ms
+model forward took 1.0006ms
+model backward took 0.692107ms
+PairMetatensor::compute took 63.9805ms
+        65   158.01382     -45.506164     -44.872993     -4.692656       117.53523    
+convert neighbors took 61.6931ms
+convert system took 62.8511ms
+model forward took 1.06649ms
+model backward took 0.852927ms
+PairMetatensor::compute took 73.5632ms
+        66   158.14518     -45.507646     -44.873948     -9629.2579      117.7596     
+convert neighbors took 65.0617ms
+convert system took 66.2615ms
+model forward took 1.06448ms
+model backward took 0.769901ms
+PairMetatensor::compute took 68.2238ms
+        67   158.66847     -45.51032      -44.874525     -15632.807      117.89799    
+convert neighbors took 65.1719ms
+convert system took 66.4025ms
+model forward took 1.1548ms
+model backward took 0.789043ms
+PairMetatensor::compute took 68.4837ms
+        68   159.57845     -45.515504     -44.876063     -16644.356      117.91465    
+convert neighbors took 63.4454ms
+convert system took 64.7212ms
+model forward took 0.995805ms
+model backward took 0.702955ms
+PairMetatensor::compute took 66.5345ms
+        69   160.84867     -45.523281     -44.87875      -12803.387      117.81253    
+convert neighbors took 62.5519ms
+convert system took 63.7121ms
+model forward took 1.08232ms
+model backward took 0.752953ms
+PairMetatensor::compute took 65.672ms
+        70   162.43165     -45.532479     -44.881605     -5580.8262      117.62912    
+convert neighbors took 63.7386ms
+convert system took 64.9519ms
+model forward took 1.06999ms
+model backward took 0.74754ms
+PairMetatensor::compute took 66.8866ms
+        71   164.26319     -45.541877     -44.883664      2661.7864      117.42269    
+convert neighbors took 62.1675ms
+convert system took 63.3846ms
+model forward took 1.05096ms
+model backward took 0.739868ms
+PairMetatensor::compute took 65.2925ms
+        72   166.27063     -45.551237     -44.88498       9353.574       117.25345    
+convert neighbors took 63.6859ms
+convert system took 64.9139ms
+model forward took 1.06985ms
+model backward took 0.745774ms
+PairMetatensor::compute took 66.8503ms
+        73   168.38361     -45.561144     -44.88642       12518.293      117.16536    
+convert neighbors took 61.1713ms
+convert system took 62.3389ms
+model forward took 1.0629ms
+model backward took 0.790267ms
+PairMetatensor::compute took 64.3135ms
+        74   170.54461     -45.572008     -44.888625      11421.198      117.17399    
+convert neighbors took 73.3022ms
+convert system took 74.5419ms
+model forward took 1.19561ms
+model backward took 0.852532ms
+PairMetatensor::compute took 76.7298ms
+        75   172.71586     -45.58346      -44.891376      6757.1279      117.26398    
+convert neighbors took 65.3665ms
+convert system took 66.7272ms
+model forward took 1.52732ms
+model backward took 0.904785ms
+PairMetatensor::compute took 69.3251ms
+        76   174.87983     -45.594763     -44.894008      292.72006      117.39625    
+convert neighbors took 63.6307ms
+convert system took 64.8624ms
+model forward took 1.10859ms
+model backward took 0.808826ms
+PairMetatensor::compute took 66.9357ms
+        77   177.03253     -45.60561      -44.896229     -5831.3302      117.52189    
+convert neighbors took 66.8207ms
+convert system took 68.0531ms
+model forward took 1.08593ms
+model backward took 0.7998ms
+PairMetatensor::compute took 70.0702ms
+        78   179.17164     -45.616345     -44.898393     -9805.5169      117.59794    
+convert neighbors took 65.6463ms
+convert system took 66.8836ms
+model forward took 1.23377ms
+model backward took 0.788904ms
+PairMetatensor::compute took 69.0538ms
+        79   181.28366     -45.627429     -44.901013     -10628.047      117.59984    
+convert neighbors took 66.5727ms
+convert system took 67.8464ms
+model forward took 1.03646ms
+model backward took 0.706276ms
+PairMetatensor::compute took 69.7051ms
+        80   183.33429     -45.638806     -44.904174     -8286.9916      117.52738    
+convert neighbors took 62.5682ms
+convert system took 63.7391ms
+model forward took 1.03867ms
+model backward took 0.752747ms
+PairMetatensor::compute took 65.66ms
+        81   185.26541     -45.649848     -44.907478     -3680.5952      117.40292    
+convert neighbors took 61.9593ms
+convert system took 63.1243ms
+model forward took 1.01445ms
+model backward took 0.718539ms
+PairMetatensor::compute took 64.9795ms
+        82   186.9999      -45.659836     -44.910516      1678.1515      117.26318    
+convert neighbors took 60.5574ms
+convert system took 61.701ms
+model forward took 1.0428ms
+model backward took 0.7488ms
+PairMetatensor::compute took 63.6196ms
+        83   188.45314     -45.668443     -44.913299      6120.8799      117.14727    
+convert neighbors took 62.0992ms
+convert system took 63.3076ms
+model forward took 0.990979ms
+model backward took 0.753998ms
+PairMetatensor::compute took 65.1744ms
+        84   189.54808     -45.675729     -44.916197      8343.4375      117.08474    
+convert neighbors took 61.3939ms
+convert system took 62.5342ms
+model forward took 1.05996ms
+model backward took 0.794628ms
+PairMetatensor::compute took 64.5231ms
+        85   190.2288      -45.681761     -44.919502      7815.6322      117.08729    
+convert neighbors took 64.1953ms
+convert system took 65.431ms
+model forward took 1.1175ms
+model backward took 0.815411ms
+PairMetatensor::compute took 67.4953ms
+        86   190.46805     -45.686351     -44.923133      4915.615       117.14651    
+convert neighbors took 64.6877ms
+convert system took 65.9515ms
+model forward took 1.1804ms
+model backward took 0.85125ms
+PairMetatensor::compute took 68.1379ms
+        87   190.26629     -45.68919      -44.926781      737.00925      117.23791    
+convert neighbors took 62.6756ms
+convert system took 63.9086ms
+model forward took 1.25828ms
+model backward took 0.73134ms
+PairMetatensor::compute took 66.0237ms
+        88   189.64335     -45.690185     -44.930272     -3329.4577      117.32968    
+convert neighbors took 60.5677ms
+convert system took 61.7115ms
+model forward took 1.03443ms
+model backward took 0.714981ms
+PairMetatensor::compute took 63.578ms
+        89   188.62641     -45.689554     -44.933716     -6055.6359      117.39291    
+convert neighbors took 60.9504ms
+convert system took 62.1106ms
+model forward took 1.01152ms
+model backward took 0.711629ms
+PairMetatensor::compute took 63.9682ms
+        90   187.23951     -45.687609     -44.937328     -6720.772       117.41016    
+convert neighbors took 60.8839ms
+convert system took 62.027ms
+model forward took 1.04817ms
+model backward took 0.796711ms
+PairMetatensor::compute took 63.9973ms
+        91   185.49796     -45.684466     -44.941163     -5268.8146      117.37985    
+convert neighbors took 62.643ms
+convert system took 63.8574ms
+model forward took 0.989152ms
+model backward took 0.696253ms
+PairMetatensor::compute took 65.6598ms
+        92   183.40936     -45.679999     -44.945066     -2273.416       117.31562    
+convert neighbors took 61.726ms
+convert system took 62.8626ms
+model forward took 1.14075ms
+model backward took 0.837771ms
+PairMetatensor::compute took 64.9925ms
+        93   180.97992     -45.674058     -44.94886       1261.8967      117.24112    
+convert neighbors took 66.3194ms
+convert system took 67.5822ms
+model forward took 1.08098ms
+model backward took 0.787637ms
+PairMetatensor::compute took 69.6089ms
+        94   178.22306     -45.66669      -44.952539      4219.1591      117.18213    
+convert neighbors took 62.0979ms
+convert system took 63.3696ms
+model forward took 1.06875ms
+model backward took 0.781569ms
+PairMetatensor::compute took 65.3488ms
+        95   175.16667     -45.658148     -44.956244      5714.9925      117.15853    
+convert neighbors took 64.6725ms
+convert system took 65.8951ms
+model forward took 1.04578ms
+model backward took 0.75882ms
+PairMetatensor::compute took 67.8518ms
+        96   171.85597     -45.648714     -44.960077      5372.1042      117.17853    
+convert neighbors took 61.1928ms
+convert system took 62.3328ms
+model forward took 1.05532ms
+model backward took 0.758928ms
+PairMetatensor::compute took 64.2723ms
+        97   168.35085     -45.638565     -44.963973      3414.1922      117.23678    
+convert neighbors took 62.3932ms
+convert system took 63.5839ms
+model forward took 1.0179ms
+model backward took 0.736246ms
+PairMetatensor::compute took 65.4562ms
+        98   164.71892     -45.627807     -44.967768      552.67199      117.31689    
+convert neighbors took 61.0566ms
+convert system took 62.1927ms
+model forward took 1.0703ms
+model backward took 0.781031ms
+PairMetatensor::compute took 64.1692ms
+        99   161.02665     -45.616613     -44.971369     -2278.3136      117.39709    
+convert neighbors took 62.6364ms
+convert system took 63.82ms
+model forward took 1.34383ms
+model backward took 0.790727ms
+PairMetatensor::compute took 66.0936ms
+       100   157.33192     -45.605267     -44.974827     -4229.0175      117.45716    
+Loop time of 6.22967 on 1 procs for 100 steps with 32 atoms
+
+Performance: 1.387 ns/day, 17.305 hours/ns, 16.052 timesteps/s, 513.670 atom-step/s
+299.0% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 6.2041     | 6.2041     | 6.2041     |   0.0 | 99.59
+Neigh   | 0.022519   | 0.022519   | 0.022519   |   0.0 |  0.36
+Comm    | 0.0009646  | 0.0009646  | 0.0009646  |   0.0 |  0.02
+Output  | 0.00085206 | 0.00085206 | 0.00085206 |   0.0 |  0.01
+Modify  | 0.0009635  | 0.0009635  | 0.0009635  |   0.0 |  0.02
+Other   |            | 0.0002779  |            |       |  0.00
+
+Nlocal:             32 ave          32 max          32 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:           2425 ave        2425 max        2425 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:        21568 ave       21568 max       21568 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 21568
+Ave neighs/atom = 674
+Neighbor list builds = 3
+Dangerous builds = 0
+Total wall time: 0:00:06

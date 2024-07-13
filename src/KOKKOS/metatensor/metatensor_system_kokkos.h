@@ -28,10 +28,11 @@
 
 namespace LAMMPS_NS {
 
+template<class LMPDeviceType>
 struct MetatensorSystemOptionsKokkos {
     // Mapping from LAMMPS types to metatensor types
     const int32_t* types_mapping;
-    const Kokkos::View<int32_t*> types_mapping_kokkos;
+    const Kokkos::View<int32_t*, Kokkos::LayoutRight, LMPDeviceType> types_mapping_kokkos;
     // interaction range of the model, in LAMMPS units
     double interaction_range;
     // should we run extra checks on the neighbor lists?
@@ -81,8 +82,8 @@ struct MetatensorNeighborsDataKokkos {
 template<class LMPDeviceType>
 class MetatensorSystemAdaptorKokkos : public Pointers {
 public:
-    MetatensorSystemAdaptorKokkos(LAMMPS* lmp, Pair* requestor, MetatensorSystemOptionsKokkos options);
-    MetatensorSystemAdaptorKokkos(LAMMPS* lmp, Compute* requestor, MetatensorSystemOptionsKokkos options);
+    MetatensorSystemAdaptorKokkos(LAMMPS* lmp, Pair* requestor, MetatensorSystemOptionsKokkos<LMPDeviceType> options);
+    MetatensorSystemAdaptorKokkos(LAMMPS* lmp, Compute* requestor, MetatensorSystemOptionsKokkos<LMPDeviceType> options);
 
     ~MetatensorSystemAdaptorKokkos();
 
@@ -106,7 +107,7 @@ private:
     void setup_neighbors(metatensor_torch::System& system);
 
     // options for this system adaptor
-    MetatensorSystemOptionsKokkos options_;
+    MetatensorSystemOptionsKokkos<LMPDeviceType> options_;
 
     // LAMMPS NL
     NeighList* list_;

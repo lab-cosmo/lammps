@@ -1,0 +1,35 @@
+LAMMPS (17 Apr 2024 - Development - patch_27Oct2021-10499-g9eaf5e7e1a-modified)
+KOKKOS mode with Kokkos version 4.3.1 is enabled (src/KOKKOS/kokkos.cpp:72)
+  will use up to 1 GPU(s) per node
+WARNING: When using a single thread, the Kokkos Serial backend (i.e. Makefile.kokkos_mpi_only) gives better performance than the OpenMP backend (src/KOKKOS/kokkos.cpp:202)
+  using 1 OpenMP thread(s) per MPI task
+Lattice spacing in x,y,z = 3.6 3.6 3.6
+Created orthogonal box = (0 0 0) to (7.2 7.2 7.2)
+  1 by 1 by 1 MPI processor grid
+Created 32 atoms
+  using lattice units in orthogonal box = (0 0 0) to (7.2 7.2 7.2)
+  create_atoms CPU = 0.002 seconds
+settings
+
+This is the Test Lennard-Jones model
+====================================
+
+Minimal shifted Lennard-Jones potential, to be used when testing the
+integration of metatensor atomistic models with various simulation engines.
+
+Model authors
+-------------
+
+- Guillaume Fraux <guillaume.fraux@epfl.ch>
+
+Model references
+----------------
+
+Please cite the following references when using this model:
+- about this specific model:
+  * https://github.com/luthaf/metatensor-lj-test
+- about the implementation of this model:
+  * https://github.com/lab-cosmo/metatensor
+
+ERROR: failed to find requested device (cuda): it is either not supported by this model or not available on this machine (src/KOKKOS/pair_metatensor_kokkos.cpp:318)
+Last command: pair_style metatensor/kk nickel-lj.pt device cuda

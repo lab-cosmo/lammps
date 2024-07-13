@@ -27,6 +27,12 @@
 #include "kokkos.h"
 #include "atom_kokkos.h"
 
+#ifndef KOKKOS_ENABLE_CUDA
+namespace Kokkos {
+class Cuda {};
+} // namespace Kokkos
+#endif // KOKKOS_ENABLE_CUDA
+
 #include <iostream>
 
 using namespace LAMMPS_NS;
@@ -34,13 +40,20 @@ using namespace LAMMPS_NS;
 /* ---------------------------------------------------------------------- */
 
 template<class LMPDeviceType>
-MetatensorSystemAdaptorKokkos<LMPDeviceType>::MetatensorSystemAdaptorKokkos(LAMMPS *lmp, Pair* requestor, MetatensorSystemOptionsKokkos options):
+MetatensorSystemAdaptorKokkos<LMPDeviceType>::MetatensorSystemAdaptorKokkos(LAMMPS *lmp, Pair* requestor, MetatensorSystemOptionsKokkos<LMPDeviceType> options):
     Pointers(lmp),
     list_(nullptr),
     options_(std::move(options)),
     caches_(),
-    atomic_types_(torch::zeros({0}, torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU)))
+    atomic_types_(torch::zeros({0}, torch::TensorOptions().dtype(torch::kInt32)))
 {
+    torch::Device device = torch::kCPU;
+    if (std::is_same<LMPDeviceType, Kokkos::Cuda>::value) {
+        device = torch::kCUDA;
+    } else {
+        device = torch::kCPU;
+    }
+
     // We ask LAMMPS for a full neighbor lists because we need to know about
     // ALL pairs, even if options->full_list() is false. We will then filter
     // the pairs to only include each pair once where needed.
@@ -48,22 +61,29 @@ MetatensorSystemAdaptorKokkos<LMPDeviceType>::MetatensorSystemAdaptorKokkos(LAMM
     request->set_id(0);
     request->set_cutoff(options_.interaction_range);
 
-    this->strain = torch::eye(3, torch::TensorOptions().dtype(torch::kFloat64).device(torch::kCPU).requires_grad(true));
+    this->strain = torch::eye(3, torch::TensorOptions().dtype(torch::kFloat64).device(device).requires_grad(true));
 }
 
 template<class LMPDeviceType>
-MetatensorSystemAdaptorKokkos<LMPDeviceType>::MetatensorSystemAdaptorKokkos(LAMMPS *lmp, Compute* requestor, MetatensorSystemOptionsKokkos options):
+MetatensorSystemAdaptorKokkos<LMPDeviceType>::MetatensorSystemAdaptorKokkos(LAMMPS *lmp, Compute* requestor, MetatensorSystemOptionsKokkos<LMPDeviceType> options):
     Pointers(lmp),
     list_(nullptr),
     options_(std::move(options)),
     caches_(),
-    atomic_types_(torch::zeros({0}, torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU)))
+    atomic_types_(torch::zeros({0}, torch::TensorOptions().dtype(torch::kInt32)))
 {
+    torch::Device device = torch::kCPU;
+    if (std::is_same<LMPDeviceType, Kokkos::Cuda>::value) {
+        device = torch::kCUDA;
+    } else {
+        device = torch::kCPU;
+    }
+
     auto request = neighbor->add_request(requestor, NeighConst::REQ_FULL | NeighConst::REQ_GHOST);
     request->set_id(0);
     request->set_cutoff(options_.interaction_range);
 
-    this->strain = torch::eye(3, torch::TensorOptions().dtype(torch::kFloat64).device(torch::kCPU).requires_grad(true));
+    this->strain = torch::eye(3, torch::TensorOptions().dtype(torch::kFloat64).device(device).requires_grad(true));
 }
 
 template<class LMPDeviceType>
@@ -104,48 +124,21 @@ void MetatensorSystemAdaptorKokkos<LMPDeviceType>::add_nl_request(double cutoff,
 }
 
 
-static std::array<int32_t, 3> cell_shifts(
-    const std::array<std::array<double, 3>, 3>& cell_inv,
-    const std::array<double, 3>& pair_shift
-) {
-    auto shift_a = static_cast<int32_t>(std::round(
-        cell_inv[0][0] * pair_shift[0] +
-        cell_inv[0][1] * pair_shift[1] +
-        cell_inv[0][2] * pair_shift[2]
-    ));
-    auto shift_b = static_cast<int32_t>(std::round(
-        cell_inv[1][0] * pair_shift[0] +
-        cell_inv[1][1] * pair_shift[1] +
-        cell_inv[1][2] * pair_shift[2]
-    ));
-    auto shift_c = static_cast<int32_t>(std::round(
-        cell_inv[2][0] * pair_shift[0] +
-        cell_inv[2][1] * pair_shift[1] +
-        cell_inv[2][2] * pair_shift[2]
-    ));
-
-    return {shift_a, shift_b, shift_c};
-}
-
-
 template<class LMPDeviceType>
 void MetatensorSystemAdaptorKokkos<LMPDeviceType>::setup_neighbors(metatensor_torch::System& system) {
     // std::cout << "MetatensorSystemAdaptorKokkos::setup_neighbors" << std::endl;
     auto dtype = system->positions().scalar_type();
     auto device = system->positions().device();
 
-    double** x = atom->x;
+    auto positions_kokkos = this->atomKK->k_x.view<LMPDeviceType>();
     auto total_n_atoms = atomKK->nlocal + atomKK->nghost;
 
-    auto cell_inv_tensor = system->cell().inverse().t().to(torch::kCPU).to(torch::kFloat64);
-    auto cell_inv_accessor = cell_inv_tensor.accessor<double, 2>();
-    auto cell_inv = std::array<std::array<double, 3>, 3>{{
-        {{cell_inv_accessor[0][0], cell_inv_accessor[0][1], cell_inv_accessor[0][2]}},
-        {{cell_inv_accessor[1][0], cell_inv_accessor[1][1], cell_inv_accessor[1][2]}},
-        {{cell_inv_accessor[2][0], cell_inv_accessor[2][1], cell_inv_accessor[2][2]}},
-    }};
+    auto cell_inv_tensor = system->cell().inverse().t().to(device).to(torch::kFloat64);
+    // it might be a good idea to have this as float32 if the model is using float32
+    // to speed up the computation, especially on GPU
 
-    // auto cell_inv_kokkos = Kokkos::View<double[3][3], Kokkos::MemoryTraits<Kokkos::Unmanaged>>("cell_inv_kokkos", cell_inv_tensor.data_ptr<double>(), tensor.numel());
+
+    /*-------------- whatever, this will be done on CPU for now ------------------------*/
 
     // Collect the local atom id of all local & ghosts atoms, mapping ghosts
     // atoms which are periodic images of local atoms back to the local atoms.
@@ -187,145 +180,112 @@ void MetatensorSystemAdaptorKokkos<LMPDeviceType>::setup_neighbors(metatensor_to
             }
         }
     }
+    /*----------- end of whatever, this will be done on CPU for now --------------*/
+
+    auto original_atom_id_tensor = torch::from_blob(
+        original_atom_id_.data(),
+        {total_n_atoms},
+        torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU)
+    );
+    original_atom_id_tensor = original_atom_id_tensor.to(device);  // RIP
+
+    // Accumulate total number of pairs
+    int total_number_of_pairs = 0;
+    for (int ii=0; ii<(list_->inum + list_->gnum); ii++) {
+        total_number_of_pairs += list_->numneigh[ii];
+    }
+    std::vector<int> centers(total_number_of_pairs);
+    std::vector<int> neighbors(total_number_of_pairs);
+
+    // Fill the centers and neighbors arrays with the original atom ids
+    int pair_index = 0;
+    for (int ii=0; ii<(list_->inum + list_->gnum); ii++) {
+        auto atom_i = list_->ilist[ii];
+        auto neighbors_ii = list_->firstneigh[ii];
+        for (int jj=0; jj<list_->numneigh[ii]; jj++) {
+            centers[pair_index] = atom_i;
+            neighbors[pair_index] = neighbors_ii[jj];
+            pair_index++;
+        }
+    }
+
+    // Create torch tensors for the centers and neighbors arrays
+    auto centers_tensor = torch::from_blob(
+        centers.data(),
+        {total_number_of_pairs},
+        torch::TensorOptions().dtype(torch::kInt32).device(device)
+    );
+    auto neighbors_tensor = torch::from_blob(
+        neighbors.data(),
+        {total_number_of_pairs},
+        torch::TensorOptions().dtype(torch::kInt32).device(device)
+    );
+
+    // change centers and neighbors to the original atom ids
+    auto centers_tensor_original_id = original_atom_id_tensor.index_select(0, centers_tensor);
+    auto neighbors_tensor_original_id = original_atom_id_tensor.index_select(0, neighbors_tensor);
+
+    // create torch tensor with the positions (TEMPORARY, TODO: change)
+    auto positions_tensor = torch::from_blob(
+        positions_kokkos.data(),
+        {total_n_atoms, 3},
+        torch::TensorOptions().dtype(torch::kFloat64).device(device)
+    );
 
     for (auto& cache: caches_) {
-        auto cutoff2 = cache.cutoff * cache.cutoff;
+        // half list mask, if necessary (TODO: change names! This could modify the tensors outside the loop if more than one NL!)
         auto full_list = cache.options->full_list();
-
-        // convert from LAMMPS neighbors list to metatensor format
-        cache.known_samples.clear();
-        cache.samples.clear();
-        cache.distances_f32.clear();
-        cache.distances_f64.clear();
-        for (int ii=0; ii<(list_->inum + list_->gnum); ii++) {
-            auto atom_i = list_->ilist[ii];
-            auto original_atom_i = original_atom_id_[atom_i];
-
-            auto neighbors = list_->firstneigh[ii];
-            for (int jj=0; jj<list_->numneigh[ii]; jj++) {
-                auto atom_j = neighbors[jj];
-                auto original_atom_j = original_atom_id_[atom_j];
-
-                if (!full_list && original_atom_i > original_atom_j) {
-                    // Remove extra pairs if the model requested half-lists
-                    continue;
-                }
-
-                auto distance = std::array<double, 3>{
-                    x[atom_j][0] - x[atom_i][0],
-                    x[atom_j][1] - x[atom_i][1],
-                    x[atom_j][2] - x[atom_i][2],
-                };
-
-                auto distance2 = (
-                    distance[0] * distance[0] +
-                    distance[1] * distance[1] +
-                    distance[2] * distance[2]
-                );
-                if (distance2 > cutoff2) {
-                    // LAMMPS neighbors list contains some pairs after the
-                    // cutoff, we filter them here
-                    continue;
-                }
-
-                // Compute the cell shift for the pair.
-                auto shift_i = std::array<double, 3>{
-                    x[atom_i][0] - x[original_atom_i][0],
-                    x[atom_i][1] - x[original_atom_i][1],
-                    x[atom_i][2] - x[original_atom_i][2],
-                };
-                auto shift_j = std::array<double, 3>{
-                    x[atom_j][0] - x[original_atom_j][0],
-                    x[atom_j][1] - x[original_atom_j][1],
-                    x[atom_j][2] - x[original_atom_j][2],
-                };
-                auto pair_shift = std::array<double, 3>{
-                    shift_j[0] - shift_i[0],
-                    shift_j[1] - shift_i[1],
-                    shift_j[2] - shift_i[2],
-                };
-
-                auto shift = std::array<int32_t, 3>{0, 0, 0};
-                if (pair_shift[0] != 0 || pair_shift[1] != 0 || pair_shift[2] != 0) {
-                    shift = cell_shifts(cell_inv, pair_shift);
-
-                    if (!full_list && original_atom_i == original_atom_j) {
-                        // If a half neighbors list has been requested, do
-                        // not include the same pair between an atom and
-                        // it's periodic image twice with opposite cell
-                        // shifts (e.g. [1, -1, 1] and [-1, 1, -1]).
-                        //
-                        // Instead we pick pairs in the positive plan of
-                        // shifts.
-                        if (shift[0] + shift[1] + shift[2] < 0) {
-                            // drop shifts on the negative half-space
-                            continue;
-                        }
-
-                        if ((shift[0] + shift[1] + shift[2] == 0)
-                            && (shift[2] < 0 || (shift[2] == 0 && shift[1] < 0))) {
-                            // drop shifts in the negative half plane or the
-                            // negative shift[1] axis.
-                            //
-                            // See below for a graphical representation: we are
-                            // keeping the shifts indicated with `O` and
-                            // dropping the ones indicated with `X`
-                            //
-                            //  O O O │ O O O
-                            //  O O O │ O O O
-                            //  O O O │ O O O
-                            // ─X─X─X─┼─O─O─O─
-                            //  X X X │ X X X
-                            //  X X X │ X X X
-                            //  X X X │ X X X
-                            continue;
-                        }
-                    }
-                }
-
-                auto sample = std::array<int32_t, 5>{
-                    original_atom_i,
-                    original_atom_j,
-                    shift[0],
-                    shift[1],
-                    shift[2],
-                };
-
-                // only add the pair if it is not already known. The same pair
-                // can occur multiple time between two periodic ghosts shifted
-                // around by the same amount, but we only want one of these pairs.
-                // if (cache.known_samples.insert(sample).second) {
-                    cache.samples.push_back(sample);
-
-                    if (dtype == torch::kFloat64) {
-                        cache.distances_f64.push_back(distance);
-                    } else if (dtype == torch::kFloat32) {
-                        cache.distances_f32.push_back({
-                            static_cast<float>(distance[0]),
-                            static_cast<float>(distance[1]),
-                            static_cast<float>(distance[2])
-                        });
-                    } else {
-                        // should be unreachable
-                        error->all(FLERR, "invalid dtype, this is a bug");
-                    }
-                // }
-            }
+        if (!full_list) {
+            auto half_list_mask = centers_tensor_original_id <= neighbors_tensor_original_id;
+            centers_tensor = centers_tensor.masked_select(half_list_mask);
+            neighbors_tensor = neighbors_tensor.masked_select(half_list_mask);
+            centers_tensor_original_id = centers_tensor_original_id.masked_select(half_list_mask);
+            neighbors_tensor_original_id = neighbors_tensor_original_id.masked_select(half_list_mask);
         }
 
-        int64_t n_pairs = cache.samples.size();
-        auto samples_values = torch::from_blob(
-            reinterpret_cast<int32_t*>(cache.samples.data()),
-            {n_pairs, 5},
-            torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU)
-        );
+        // distance mask
+        auto interatomic_vectors = positions_tensor.index_select(0, neighbors_tensor) - positions_tensor.index_select(0, centers_tensor);
+        auto distance_mask = torch::sum(interatomic_vectors.pow(2), 1) < cache.cutoff*cache.cutoff;
 
-        auto [samples_values_unique, samples_inverse, counts] = torch::unique_dim(
-            samples_values,
-            /*dim=*/0,
-            /*sorted=*/true,
-            /*return_inverse=*/true,
-            /*return_counts=*/true
+        // index everything with the mask
+        auto centers_tensor_original_id_filtered = centers_tensor_original_id.masked_select(distance_mask);
+        auto neighbors_tensor_original_id_filtered = neighbors_tensor_original_id.masked_select(distance_mask);
+        auto interatomic_vectors_filtered = interatomic_vectors.index({distance_mask, torch::indexing::Slice()});
+
+        // find filtered interatomic vectors using the original atoms
+        auto interatomic_vectors_original_filtered = positions_tensor.index_select(0, neighbors_tensor_original_id_filtered) - positions_tensor.index_select(0, centers_tensor_original_id_filtered);
+
+        // cell shifts
+        auto pair_shifts = interatomic_vectors_filtered - interatomic_vectors_original_filtered;
+        auto cell_shifts = pair_shifts.matmul(cell_inv_tensor);
+        cell_shifts = torch::round(cell_shifts).to(torch::kInt32);
+
+        if (!full_list) {
+            auto half_list_cell_mask = centers_tensor_original_id_filtered == neighbors_tensor_original_id_filtered;
+            auto negative_half_space_mask = torch::sum(cell_shifts, 1) < 0;
+            // reproduce this mask with torch:
+            // if ((shift[0] + shift[1] + shift[2] == 0) && (shift[2] < 0 || (shift[2] == 0 && shift[1] < 0)))
+            auto edge_mask = (
+                torch::sum(cell_shifts, 1) == 0 & (
+                    cell_shifts.index({torch::indexing::Slice(), 2}) < 0 | (
+                        cell_shifts.index({torch::indexing::Slice(), 2}) == 0 &
+                        cell_shifts.index({torch::indexing::Slice(), 1}) < 0
+                    )
+                )
+            );
+            auto final_mask = torch::logical_not(half_list_cell_mask & (negative_half_space_mask | edge_mask));
+            centers_tensor_original_id_filtered = centers_tensor_original_id_filtered.masked_select(final_mask);
+            neighbors_tensor_original_id_filtered = neighbors_tensor_original_id_filtered.masked_select(final_mask);
+            interatomic_vectors_filtered = interatomic_vectors_filtered.index({final_mask, torch::indexing::Slice()});
+            cell_shifts = cell_shifts.index({final_mask, torch::indexing::Slice()});
+        }
+
+        centers_tensor_original_id_filtered = centers_tensor_original_id_filtered.unsqueeze(-1);
+        neighbors_tensor_original_id_filtered = neighbors_tensor_original_id_filtered.unsqueeze(-1);
+        auto samples_values = torch::concatenate({centers_tensor_original_id_filtered, neighbors_tensor_original_id_filtered, cell_shifts}, 1);
+
+        auto [samples_values_unique, samples_inverse, _] = torch::unique_dim(
+            samples_values, /*dim=*/0, /*sorted=*/true, /*return_inverse=*/true, /*return_counts=*/false
         );
 
         auto permutation = torch::arange(samples_inverse.size(0), samples_inverse.options());
@@ -340,26 +300,8 @@ void MetatensorSystemAdaptorKokkos<LMPDeviceType>::setup_neighbors(metatensor_to
             samples_values_unique
         );
 
-        auto distances_vectors = torch::Tensor();
-        if (dtype == torch::kFloat64) {
-            distances_vectors = torch::from_blob(
-                cache.distances_f64.data(),
-                {n_pairs, 3, 1},
-                torch::TensorOptions().dtype(torch::kFloat64).device(torch::kCPU)
-            );
-        } else if (dtype == torch::kFloat32) {
-            distances_vectors = torch::from_blob(
-                cache.distances_f32.data(),
-                {n_pairs, 3, 1},
-                torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCPU)
-            );
-        } else {
-            // should be unreachable
-            error->all(FLERR, "invalid dtype, this is a bug");
-        }
-
-        auto neighbors = torch::make_intrusive<metatensor_torch::TensorBlockHolder>(
-            distances_vectors.index_select(0, sample_indices).to(dtype).to(device),
+        auto neighbor_list = torch::make_intrusive<metatensor_torch::TensorBlockHolder>(
+            interatomic_vectors_filtered.index_select(0, sample_indices).unsqueeze(-1).to(dtype).to(device),
             samples->to(device),
             std::vector<metatensor_torch::TorchLabels>{
                 metatensor_torch::LabelsHolder::create({"xyz"}, {{0}, {1}, {2}})->to(device),
@@ -367,8 +309,8 @@ void MetatensorSystemAdaptorKokkos<LMPDeviceType>::setup_neighbors(metatensor_to
             metatensor_torch::LabelsHolder::create({"distance"}, {{0}})->to(device)
         );
 
-        metatensor_torch::register_autograd_neighbors(system, neighbors, options_.check_consistency);
-        system->add_neighbor_list(cache.options, neighbors);
+        metatensor_torch::register_autograd_neighbors(system, neighbor_list, options_.check_consistency);
+        system->add_neighbor_list(cache.options, neighbor_list);
     }
 }
 
@@ -384,7 +326,7 @@ metatensor_torch::System MetatensorSystemAdaptorKokkos<LMPDeviceType>::system_fr
 
     auto atom_types_lammps_kokkos = atomKK->k_type.view<LMPDeviceType>();
     auto mapping = options_.types_mapping_kokkos;
-    Kokkos::View<int32_t*> atom_types_metatensor_kokkos("atom_types_metatensor", total_n_atoms);   /// Can be a class member? (allocation alert)
+    Kokkos::View<int32_t*, Kokkos::LayoutRight, LMPDeviceType> atom_types_metatensor_kokkos("atom_types_metatensor", total_n_atoms);   /// Can be a class member? (allocation alert)
     
     Kokkos::parallel_for(
         "MetatensorSystemAdaptorKokkos::system_from_lmp::atom_types_mapping",
@@ -408,7 +350,7 @@ metatensor_torch::System MetatensorSystemAdaptorKokkos<LMPDeviceType>::system_fr
         positions_kokkos.data(), {total_n_atoms, 3},
         // requires_grad=true since we always need gradients w.r.t. positions
         tensor_options
-    ).clone().requires_grad_(true);  /// Allocation alert
+    ).clone().requires_grad_(true);  /// Allocation alert (clone)
 
     auto cell = torch::zeros({3, 3}, tensor_options);  /// Allocation alert, we could make it a class member and allocate it once
     /// domain doesn't seem to have a Kokkos version
@@ -420,13 +362,13 @@ metatensor_torch::System MetatensorSystemAdaptorKokkos<LMPDeviceType>::system_fr
     cell[2][0] = domain->xz;
     cell[2][1] = domain->yz;
     cell[2][2] = domain->zprd;
-    /// And the other elements?
+    /// And the other elements? Are they always zero?
 
     auto system_positions = this->positions;
     cell = cell.to(dtype).to(device);   /// to(device) alert. How do we find the cell on Kokkos?
 
     if (do_virial) {
-        auto model_strain = this->strain.to(dtype).to(device);  /// to(device) alert, potentially easy to fix
+        auto model_strain = this->strain.to(dtype);  /// already on the correct device
 
         // pretend to scale positions/cell by the strain so that
         // it enters the computational graph.

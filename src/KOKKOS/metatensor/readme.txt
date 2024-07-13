@@ -5,6 +5,6 @@ To be compiled as
 cmake ../cmake/ -DPKG_ML-METATENSOR=ON -DPKG_KOKKOS=ON -DKokkos_ENABLE_OPENMP=ON -DKokkos_ENABLE_CUDA=ON
 
 Run the example with
-../../build/lmp -k on g 1 -pk kokkos newton on -in in.metatensor_kokkos
+../../../build/lmp -k on g 1 -pk kokkos newton on -in in.metatensor_kokkos
 and compare its output with the non-kokkos interface
-../../build/lmp -in in.metatensor
+../../../build/lmp -in in.metatensor
