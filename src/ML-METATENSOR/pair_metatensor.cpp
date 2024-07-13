@@ -25,7 +25,10 @@
 #include "citeme.h"
 #include "comm.h"
 
+#include "./metatensor_timer.h"
+
 #include "neigh_list.h"
+#include "neigh_request.h"
 
 #include <torch/version.h>
 #include <torch/script.h>
@@ -173,6 +176,12 @@ PairMetatensor::PairMetatensor(LAMMPS *lmp): Pair(lmp), type_mapping(nullptr) {
     this->no_virial_fdotr_compute = 1;
 
     this->mts_data = new PairMetatensorData(std::move(length_unit), std::move(energy_unit));
+
+    // settings for metatensor pair style
+    this->single_enable = 0;
+    this->restartinfo = 0;
+    this->one_coeff = 1;
+    this->manybody_flag = 1;
 }
 
 PairMetatensor::~PairMetatensor() {
@@ -420,7 +429,13 @@ void PairMetatensor::init_style() {
         mts_data->interaction_range,
         mts_data->check_consistency,
     };
-    mts_data->system_adaptor = std::make_unique<MetatensorSystemAdaptor>(lmp, this, options);
+    mts_data->system_adaptor = std::make_unique<MetatensorSystemAdaptor>(lmp, options);
+
+    // We ask LAMMPS for a full neighbor lists because we need to know about
+    // ALL pairs, even if options->full_list() is false. We will then filter
+    // the pairs to only include each pair once where needed.
+    auto request = neighbor->add_request(this, NeighConst::REQ_FULL | NeighConst::REQ_GHOST);
+    request->set_cutoff(mts_data->interaction_range);
 
     // Translate from the metatensor neighbor lists requests to LAMMPS neighbor
     // lists requests.
@@ -435,11 +450,13 @@ void PairMetatensor::init_style() {
 
 
 void PairMetatensor::init_list(int id, NeighList *ptr) {
-    mts_data->system_adaptor->init_list(id, ptr);
+    mts_list = ptr;
 }
 
 
 void PairMetatensor::compute(int eflag, int vflag) {
+    auto tm = ScopeTimer("PairMetatensor::compute");
+
     if (eflag || vflag) {
         ev_setup(eflag, vflag);
     } else {
@@ -463,7 +480,7 @@ void PairMetatensor::compute(int eflag, int vflag) {
 
     // transform from LAMMPS to metatensor System
     auto system = mts_data->system_adaptor->system_from_lmp(
-        static_cast<bool>(vflag_global), dtype, mts_data->device
+        mts_list, static_cast<bool>(vflag_global), dtype, mts_data->device
     );
 
     // only run the calculation for atoms actually in the current domain
@@ -479,6 +496,7 @@ void PairMetatensor::compute(int eflag, int vflag) {
 
     torch::IValue result_ivalue;
     try {
+        auto tm = ScopeTimer("model forward");
         result_ivalue = mts_data->model->forward({
             std::vector<metatensor_torch::System>{system},
             mts_data->evaluation_options,
@@ -490,21 +508,40 @@ void PairMetatensor::compute(int eflag, int vflag) {
 
     auto result = result_ivalue.toGenericDict();
     auto energy = result.at("energy").toCustomClass<metatensor_torch::TensorMapHolder>();
-    auto energy_tensor = metatensor_torch::TensorMapHolder::block_by_id(energy, 0)->values();
+    auto energy_block = metatensor_torch::TensorMapHolder::block_by_id(energy, 0);
+    auto energy_tensor = energy_block->values();
     auto energy_detached = energy_tensor.detach().to(torch::kCPU).to(torch::kFloat64);
+    auto energy_samples = energy_block->samples();
 
     // store the energy returned by the model
     torch::Tensor global_energy;
     if (eflag_atom) {
+        assert(energy_samples->size() == 2);
+        assert(energy_samples->names()[0] == "system");
+        assert(energy_samples->names()[1] == "atom");
+
+        auto samples_values = energy_samples->values().to(torch::kCPU);
+        auto samples = samples_values.accessor<int32_t, 2>();
+
+        int64_t n_atoms = atom->nlocal + atom->nghost;
+        assert(samples_values.sizes() == mts_data->selected_atoms_values.sizes());
+
         auto energies = energy_detached.accessor<double, 2>();
-        for (int i=0; i<atom->nlocal + atom->nghost; i++) {
-            // TODO: handle out of order samples
-            eatom[i] += energies[i][0];
+        for (int64_t i=0; i<energy_samples->count(); i++) {
+            assert(samples[i][0] == 0);
+            // handle potentially out of order samples in
+            // the per-atom energy tensor
+            auto atom_i = samples[i][1];
+            assert(atom_i < n_atoms);
+            eatom[atom_i] += energies[i][0];
         }
 
         global_energy = energy_detached.sum(0);
         assert(energy_detached.sizes() == std::vector<int64_t>({1}));
     } else {
+        assert(energy_samples->size() == 1);
+        assert(energy_samples->names()[0] == "system");
+
         assert(energy_detached.sizes() == std::vector<int64_t>({1, 1}));
         global_energy = energy_detached.reshape({1});
     }
@@ -518,7 +555,11 @@ void PairMetatensor::compute(int eflag, int vflag) {
     mts_data->system_adaptor->strain.mutable_grad() = torch::Tensor();
 
     // compute forces/virial with backward propagation
-    energy_tensor.backward(-torch::ones_like(energy_tensor));
+    {
+        auto tm = ScopeTimer("model backward");
+        energy_tensor.backward(-torch::ones_like(energy_tensor));
+
+    }
     auto forces_tensor = mts_data->system_adaptor->positions.grad();
     assert(forces_tensor.is_cpu() && forces_tensor.scalar_type() == torch::kFloat64);
 

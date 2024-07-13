@@ -294,7 +294,7 @@ void MetatensorSystemAdaptorKokkos<LMPDeviceType>::setup_neighbors(metatensor_to
                 // only add the pair if it is not already known. The same pair
                 // can occur multiple time between two periodic ghosts shifted
                 // around by the same amount, but we only want one of these pairs.
-                if (cache.known_samples.insert(sample).second) {
+                // if (cache.known_samples.insert(sample).second) {
                     cache.samples.push_back(sample);
 
                     if (dtype == torch::kFloat64) {
@@ -309,7 +309,7 @@ void MetatensorSystemAdaptorKokkos<LMPDeviceType>::setup_neighbors(metatensor_to
                         // should be unreachable
                         error->all(FLERR, "invalid dtype, this is a bug");
                     }
-                }
+                // }
             }
         }
 
@@ -320,9 +320,24 @@ void MetatensorSystemAdaptorKokkos<LMPDeviceType>::setup_neighbors(metatensor_to
             torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU)
         );
 
+        auto [samples_values_unique, samples_inverse, counts] = torch::unique_dim(
+            samples_values,
+            /*dim=*/0,
+            /*sorted=*/true,
+            /*return_inverse=*/true,
+            /*return_counts=*/true
+        );
+
+        auto permutation = torch::arange(samples_inverse.size(0), samples_inverse.options());
+        samples_inverse = samples_inverse.flip({0});
+        permutation = permutation.flip({0});
+
+        auto sample_indices = torch::empty(samples_values_unique.size(0), samples_inverse.options());
+        sample_indices.scatter_(0, samples_inverse, permutation);
+
         auto samples = torch::make_intrusive<metatensor_torch::LabelsHolder>(
             std::vector<std::string>{"first_atom", "second_atom", "cell_shift_a", "cell_shift_b", "cell_shift_c"},
-            samples_values
+            samples_values_unique
         );
 
         auto distances_vectors = torch::Tensor();
@@ -344,7 +359,7 @@ void MetatensorSystemAdaptorKokkos<LMPDeviceType>::setup_neighbors(metatensor_to
         }
 
         auto neighbors = torch::make_intrusive<metatensor_torch::TensorBlockHolder>(
-            distances_vectors.to(dtype).to(device),
+            distances_vectors.index_select(0, sample_indices).to(dtype).to(device),
             samples->to(device),
             std::vector<metatensor_torch::TorchLabels>{
                 metatensor_torch::LabelsHolder::create({"xyz"}, {{0}, {1}, {2}})->to(device),
@@ -388,7 +403,7 @@ metatensor_torch::System MetatensorSystemAdaptorKokkos<LMPDeviceType>::system_fr
     auto tensor_options = torch::TensorOptions().dtype(torch::kFloat64).device(device);
 
     // atom->x contains "real" and then ghost atoms, in that order
-    Kokkos::View<double**> positions_kokkos = atomKK->k_x.view<LMPDeviceType>();
+    auto positions_kokkos = atomKK->k_x.view<LMPDeviceType>();
     this->positions = torch::from_blob(
         positions_kokkos.data(), {total_n_atoms, 3},
         // requires_grad=true since we always need gradients w.r.t. positions

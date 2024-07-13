@@ -146,7 +146,7 @@ endif()
 if(CMAKE_CXX_STANDARD LESS 11)
   message(FATAL_ERROR "C++ standard must be set to at least 11")
 endif()
-if(PKG_KOKKOS AND (CMAKE_CXX_STANDARD LESS 17))
+if((PKG_KOKKOS OR PKG_ML-METATENSOR) AND (CMAKE_CXX_STANDARD LESS 17))
   set(CMAKE_CXX_STANDARD 17)
 endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -257,6 +257,7 @@ set(STANDARD_PACKAGES
   DRUDE
   EFF
   ELECTRODE
+  EXTRA-COMMAND
   EXTRA-COMPUTE
   EXTRA-DUMP
   EXTRA-FIX
@@ -281,12 +282,13 @@ set(STANDARD_PACKAGES
   MISC
   ML-HDNNP
   ML-IAP
+  ML-METATENSOR
   ML-PACE
+  ML-POD
   ML-QUIP
   ML-RANN
   ML-SNAP
-  ML-POD
-  ML-METATENSOR
+  ML-UF3
   MOFFF
   MOLECULE
   MOLFILE
@@ -691,7 +693,7 @@ endif()
 # packages which selectively include variants based on enabled styles
 # e.g. accelerator packages
 ######################################################################
-foreach(PKG_WITH_INCL CORESHELL DPD-SMOOTH MC MISC PHONON QEQ OPENMP KOKKOS OPT INTEL GPU)
+foreach(PKG_WITH_INCL CORESHELL DPD-BASIC DPD-SMOOTH MC MISC PHONON QEQ OPENMP KOKKOS OPT INTEL GPU)
   if(PKG_${PKG_WITH_INCL})
     include(Packages/${PKG_WITH_INCL})
   endif()

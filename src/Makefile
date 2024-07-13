@@ -74,6 +74,7 @@ PACKAGE = \
 	dpd-smooth \
 	drude \
 	eff \
+	extra-command \
 	extra-compute \
 	extra-dump \
 	extra-fix \
@@ -105,6 +106,7 @@ PACKAGE = \
 	ml-metatensor \
 	ml-rann \
 	ml-snap \
+	ml-uf3 \
 	mofff \
 	molfile \
 	netcdf \
@@ -168,6 +170,7 @@ PACKMOST = \
 	dpd-smooth \
 	drude \
 	eff \
+	extra-command \
 	extra-compute \
 	extra-dump \
 	extra-fix \
